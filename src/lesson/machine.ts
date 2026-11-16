@@ -8,7 +8,7 @@
  */
 import type { EventOf, LessonEvent } from './events'
 import { emptyLearner } from './learner'
-import { advance, answer, ensureMain, lost, seek, skip, unsure } from './machine-flow'
+import { advance, answer, ensureMain, goTo, lost, seek, skip, unsure } from './machine-flow'
 import { interrupt, patch, recap, segment, strike } from './machine-side'
 import type { LessonState } from './types'
 
@@ -17,7 +17,7 @@ export const MAX_PLANNED_SEGMENTS = 5
 function start(e: EventOf<'lesson/start'>): LessonState {
   return {
     id: e.id, topic: e.topic, createdAt: e.at, badge: e.badge,
-    phase: 'planning', plan: [], segments: {}, order: [], cursor: { seg: 'seg:1', beat: 0 },
+    phase: 'planning', plan: [], segments: {}, order: [], cursor: { seg: 'seg:1', beat: 0 }, visited: [],
     checks: {}, threads: [], overlay: null, playback: { track: 'lesson' }, struck: [], patches: {},
     practice: {}, learner: emptyLearner(),
   }
@@ -45,7 +45,7 @@ function planRecord(s: LessonState, e: EventOf<'plan/record'>): LessonState {
 
 function planDone(s: LessonState): LessonState {
   if (s.phase !== 'planning' || s.scope?.verdict === 'declined' || s.plan.length === 0) return s
-  return { ...s, phase: s.warmup ? 'warmup' : 'teaching', cursor: { seg: 'seg:1', beat: 0 } }
+  return goTo({ ...s, phase: s.warmup ? 'warmup' : 'teaching' }, { seg: 'seg:1', beat: 0 })
 }
 
 function warmup(s: LessonState, e: EventOf<'warmup/answer'> | EventOf<'warmup/skip'>): LessonState {

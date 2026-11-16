@@ -108,6 +108,8 @@ export type LessonState = {
   segments: Record<SegKey, SegmentState>
   order: SegKey[]
   cursor: Cursor
+  /** Segments the cursor has entered, in first-visit order; their pages stay on the board. */
+  visited: SegKey[]
   /** The check shown while `phase === 'checkpoint'`. */
   currentCheck?: string
   checks: Record<string, CheckRecord>

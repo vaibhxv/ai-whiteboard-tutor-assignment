@@ -15,6 +15,12 @@ export const putSeg = (s: LessonState, seg: SegmentState): LessonState => ({
 
 export const isCursor = (r: SegmentState['returnTo']): r is Cursor => !!r && 'seg' in r
 
+/** Moves the cursor, recording the segment as visited (pages stay on the board once seen). */
+export function goTo(s: LessonState, cursor: Cursor): LessonState {
+  const visited = s.visited.includes(cursor.seg) ? s.visited : [...s.visited, cursor.seg]
+  return { ...s, cursor, visited }
+}
+
 /** A main segment `seg:n` becomes pending (appended to `order`) if planned and not already there. */
 export function ensureMain(s: LessonState, n: number): LessonState {
   const key = mainKey(n)
@@ -26,7 +32,11 @@ export function ensureMain(s: LessonState, n: number): LessonState {
   return { ...putSeg(s, seg), order: [...s.order, key] }
 }
 
-/** Inserts a pending reteach/solution/lost segment right after the cursor's segment and moves the cursor to it. */
+/**
+ * Inserts a pending reteach/solution/lost segment and moves the cursor to it. It goes immediately before
+ * the next main segment after the cursor (after anything already inserted for this one), so `order`
+ * stays chronological; with no later main segment it is appended.
+ */
 function insertAndGo(
   s: LessonState, key: SegKey, kind: Exclude<SegmentKind, 'main'>, n: number, returnTo?: SegmentState['returnTo'],
 ): LessonState {
@@ -36,9 +46,10 @@ function insertAndGo(
     key, kind, n, status: 'pending', beats: [], asks: [], template, regenerated: false, ...(returnTo ? { returnTo } : {}),
   }
   const at = s.order.indexOf(s.cursor.seg)
-  const order = at < 0 ? [...s.order, key] : [...s.order.slice(0, at + 1), key, ...s.order.slice(at + 1)]
+  const nextMain = at < 0 ? -1 : s.order.findIndex((k, i) => i > at && s.segments[k]?.kind === 'main')
+  const order = nextMain < 0 ? [...s.order, key] : [...s.order.slice(0, nextMain), key, ...s.order.slice(nextMain)]
   const { currentCheck: _drop, ...rest } = putSeg(s, seg)
-  return { ...rest, order, cursor: { seg: key, beat: 0 }, phase: 'teaching' }
+  return goTo({ ...rest, order, phase: 'teaching' }, { seg: key, beat: 0 })
 }
 
 /** The main segment n whose check has this id. */
@@ -57,7 +68,7 @@ function moveOn(s: LessonState, n: number): LessonState {
   const { currentCheck: _drop, ...rest } = s
   if (s.plan[n]) {
     const t = ensureMain(rest, n + 1)
-    return { ...t, phase: 'teaching', cursor: { seg: mainKey(n + 1), beat: 0 } }
+    return goTo({ ...t, phase: 'teaching' }, { seg: mainKey(n + 1), beat: 0 })
   }
   return { ...rest, phase: 'recap', recap: s.recap ?? { ideas: [], practice: [], status: 'pending' } }
 }
@@ -72,7 +83,7 @@ function endOfSegment(s: LessonState, seg: SegmentState): LessonState {
     case 'solution':
       return moveOn(atEnd, seg.n)
     case 'lost':
-      if (isCursor(seg.returnTo)) return { ...s, phase: 'teaching', cursor: seg.returnTo }
+      if (isCursor(seg.returnTo)) return goTo({ ...s, phase: 'teaching' }, seg.returnTo)
       return seg.returnTo ? reachCheckpoint(atEnd, seg.returnTo.checkpoint) : moveOn(atEnd, seg.n)
   }
 }
@@ -98,7 +109,7 @@ export function advance(s: LessonState): LessonState {
  * seeking replays the segment; reaching its end again returns to the same checkpoint (attempts kept).
  */
 export function seek(s: LessonState, e: EventOf<'player/seek'>): LessonState {
-  if (s.phase !== 'teaching' && s.phase !== 'checkpoint') return s
+  if ((s.phase !== 'teaching' && s.phase !== 'checkpoint') || s.playback.track !== 'lesson') return s
   const seg = s.segments[e.cursor.seg]
   if (!seg || seg.key !== s.cursor.seg) return s
   const beat = Math.max(0, Math.min(Math.floor(e.cursor.beat), seg.beats.length))
@@ -139,7 +150,7 @@ export function unsure(s: LessonState, e: EventOf<'check/unsure'>): LessonState 
 }
 
 export function lost(s: LessonState): LessonState {
-  if (s.phase !== 'teaching' && s.phase !== 'checkpoint') return s
+  if ((s.phase !== 'teaching' && s.phase !== 'checkpoint') || s.playback.track !== 'lesson') return s
   const cur = s.segments[s.cursor.seg]
   if (!cur) return s
   const n = cur.n

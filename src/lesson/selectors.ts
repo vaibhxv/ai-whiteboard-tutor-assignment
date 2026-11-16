@@ -26,11 +26,19 @@ export function needs(s: LessonState): Need[] {
   return out
 }
 
-/** Segments in play order up to and including the cursor's segment. */
-function upToCursor(s: LessonState): SegmentState[] {
-  const at = s.order.indexOf(s.cursor.seg)
-  const keys: SegKey[] = at < 0 ? [] : s.order.slice(0, at + 1)
+/** Segments on the board: those in play order that the cursor has visited, plus the cursor's own. */
+function onBoard(s: LessonState): SegmentState[] {
+  const keys: SegKey[] = s.order.filter((k) => k === s.cursor.seg || s.visited.includes(k))
   return keys.flatMap((k) => s.segments[k] ?? [])
+}
+
+/**
+ * True when the lesson is parked at the end of a segment that has since completed: the player should
+ * dispatch `player/advance` to apply the end-of-segment rule.
+ */
+export function stalledAtEnd(s: LessonState): boolean {
+  const g = s.segments[s.cursor.seg]
+  return s.phase === 'teaching' && s.playback.track === 'lesson' && g?.status === 'complete' && s.cursor.beat >= g.beats.length
 }
 
 function patched(s: LessonState, b: Beat): Beat {
@@ -47,11 +55,11 @@ function patched(s: LessonState, b: Beat): Beat {
 }
 
 export function pagesInput(s: LessonState): { segKey: SegKey; template: Template; beats: Beat[] }[] {
-  return upToCursor(s).map((g) => ({ segKey: g.key, template: g.template, beats: g.beats.map((b) => patched(s, b)) }))
+  return onBoard(s).map((g) => ({ segKey: g.key, template: g.template, beats: g.beats.map((b) => patched(s, b)) }))
 }
 
-/** Beats already drawn: everything before the cursor's segment, plus earlier beats of it (and the current one if asked). */
+/** Beats already drawn: all beats of visited segments, plus the cursor segment's beats before the cursor (and the current one if asked). */
 export function visibleBeatIds(s: LessonState, opts: { includeCurrent?: boolean } = {}): string[] {
   const limit = s.cursor.beat + (opts.includeCurrent ? 1 : 0)
-  return upToCursor(s).flatMap((g) => (g.key === s.cursor.seg ? g.beats.slice(0, limit) : g.beats).map((b) => b.id))
+  return onBoard(s).flatMap((g) => (g.key === s.cursor.seg ? g.beats.slice(0, limit) : g.beats).map((b) => b.id))
 }

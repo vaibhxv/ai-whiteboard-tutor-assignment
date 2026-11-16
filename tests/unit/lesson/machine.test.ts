@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { LessonEvent } from '../../../src/lesson/events'
 import { reduce, replay } from '../../../src/lesson/machine'
-import { activeCheck, currentSegment, needs, pagesInput, visibleBeatIds } from '../../../src/lesson/selectors'
+import { activeCheck, currentSegment, needs, pagesInput, stalledAtEnd, visibleBeatIds } from '../../../src/lesson/selectors'
 import { createLessonStore } from '../../../src/lesson/store'
 import type { LessonState } from '../../../src/lesson/types'
 import {
@@ -300,6 +300,103 @@ describe('selectors, replay, purity', () => {
     s = run([wrong()], run(advance(2), s))
     expect(s.cursor.seg).toBe('reteach:c1:1')
     expect(reduce(s, { type: 'player/seek', cursor: { seg: 'seg:1', beat: 0 } })).toBe(s)
+  })
+
+  test('lost mid-segment: after return the lost beats stay visible and order is chronological', () => {
+    let s = run([...advance(1), { type: 'lost/request' }, ...fill('lost:1:1', 2), ...advance(2)], teaching())
+    expect(s.cursor).toEqual({ seg: 'seg:1', beat: 1 })
+    expect(pagesInput(s).map((p) => p.segKey)).toEqual(['seg:1', 'lost:1:1'])
+    expect(visibleBeatIds(s)).toEqual(['seg:1#0', 'lost:1:1#0', 'lost:1:1#1'])
+    s = run([{ type: 'lost/request' }, ...fill('lost:1:2', 1), ...advance(1)], s)
+    expect(s.cursor).toEqual({ seg: 'seg:1', beat: 1 })
+    expect(s.order).toEqual(['seg:1', 'lost:1:1', 'lost:1:2'])
+    s = run([...advance(1), wrong()], s)
+    expect(s.order).toEqual(['seg:1', 'lost:1:1', 'lost:1:2', 'reteach:c1:1', 'seg:2'])
+    expect(s.visited).toEqual(['seg:1', 'lost:1:1', 'lost:1:2', 'reteach:c1:1'])
+    expect(pagesInput(s).map((p) => p.segKey)).toEqual(['seg:1', 'lost:1:1', 'lost:1:2', 'reteach:c1:1'])
+    expect(JSON.parse(JSON.stringify(s))).toEqual(s)
+  })
+
+  test('retry from failed: seg/stream, thread/stream and recap/stream reset partial content without duplicates', () => {
+    const base = run([start, { type: 'plan/record', record: segPlan(1) }, { type: 'plan/done' }, { type: 'seg/stream', key: 'seg:1' },
+      { type: 'seg/beat', key: 'seg:1', beat: beat('seg:1', 0) }, { type: 'seg/ask', key: 'seg:1', ask: { t: 'ask', id: 'q1', text: 'q' } },
+      ...advance(1), { type: 'seg/failed', key: 'seg:1', error: { kind: 'offline', message: 'x' } }])
+    let s = run([{ type: 'seg/stream', key: 'seg:1' }], base)
+    expect(s.segments['seg:1']).toMatchObject({ status: 'streaming', beats: [], asks: [], regenerated: false })
+    expect(s.cursor).toEqual({ seg: 'seg:1', beat: 0 })
+    s = run([{ type: 'seg/beat', key: 'seg:1', beat: beat('seg:1', 0) }], s)
+    expect(s.segments['seg:1']?.beats.map((b) => b.id)).toEqual(['seg:1#0'])
+
+    let t = run([{ type: 'interrupt/open' }, { type: 'interrupt/ask', threadId: 't1', question: 'q', targets: [] },
+      { type: 'thread/beat', threadId: 't1', beat: beat('ans', 0) }, ...advance(1), { type: 'thread/failed', threadId: 't1', error: { kind: 'offline', message: 'x' } },
+      { type: 'thread/stream', threadId: 't1' }], teaching())
+    expect(t.threads[0]).toMatchObject({ status: 'streaming', beats: [] })
+    expect(t.playback).toEqual({ track: 'answer', threadId: 't1', beat: 0 })
+    t = run([{ type: 'thread/beat', threadId: 't1', beat: beat('ans', 0) }], t)
+    expect(t.threads[0]?.beats).toHaveLength(1)
+
+    let r = run([right(), { type: 'recap/record', record: { t: 'idea', id: 'i1', text: 'idea', seg: 1 } }, { type: 'recap/record', record: check('p1') },
+      { type: 'recap/failed', error: { kind: 'offline', message: 'x' } }, { type: 'recap/stream' }], atCheckpoint(1))
+    expect(r.recap).toEqual({ ideas: [], practice: [], status: 'streaming' })
+    r = run([{ type: 'recap/record', record: { t: 'idea', id: 'i1', text: 'idea', seg: 1 } }], r)
+    expect(r.recap?.ideas).toHaveLength(1)
+  })
+
+  test('seg/regenerate at the checkpoint: back to teaching, refill reaches the new checkpoint', () => {
+    let s = reduce(atCheckpoint(), { type: 'seg/regenerate', key: 'seg:1' })
+    expect(s.phase).toBe('teaching')
+    expect(s.currentCheck).toBeUndefined()
+    expect(s.cursor).toEqual({ seg: 'seg:1', beat: 0 })
+    s = run([...fill('seg:1', 1, 'c9'), ...advance(1)], s)
+    expect(s.phase).toBe('checkpoint')
+    expect(s.currentCheck).toBe('c9')
+  })
+
+  test('stalledAtEnd: true only while parked at the end of a segment that has completed', () => {
+    let s = run([start, { type: 'plan/record', record: segPlan(1) }, { type: 'plan/done' }, { type: 'seg/stream', key: 'seg:1' },
+      { type: 'seg/beat', key: 'seg:1', beat: beat('seg:1', 0) }, { type: 'seg/check', key: 'seg:1', check: check('c1') }, ...advance(1)])
+    expect(stalledAtEnd(s)).toBe(false)
+    s = reduce(s, { type: 'seg/done', key: 'seg:1', summary })
+    expect(stalledAtEnd(s)).toBe(true)
+    expect(stalledAtEnd(run([{ type: 'interrupt/open' }, { type: 'interrupt/ask', threadId: 't', question: 'q', targets: [] }], s))).toBe(false)
+    s = run(advance(1), s)
+    expect(s.phase).toBe('checkpoint')
+    expect(stalledAtEnd(s)).toBe(false)
+  })
+
+  test('practice/start is ignored until the recap is complete', () => {
+    let s = run([right(), { type: 'recap/record', record: check('p1') }, { type: 'practice/start' }], atCheckpoint(1))
+    expect(s.phase).toBe('recap')
+    s = run([{ type: 'recap/record', record: check('p2') }, { type: 'recap/done' }, { type: 'practice/start' },
+      { type: 'practice/answer', checkId: 'p1', grade: { result: 'correct', branch: 'a' } }], s)
+    expect(s.phase).toBe('practice')
+    expect(run([{ type: 'practice/skip', checkId: 'p2' }], s).phase).toBe('done')
+  })
+
+  test('lost/request and player/seek are ignored on the answer track', () => {
+    const s = run([...advance(1), { type: 'interrupt/open' }, { type: 'interrupt/ask', threadId: 't', question: 'q', targets: [] }], teaching())
+    expect(reduce(s, { type: 'lost/request' })).toBe(s)
+    expect(reduce(s, { type: 'player/seek', cursor: { seg: 'seg:1', beat: 0 } })).toBe(s)
+  })
+
+  test('interrupt/close under a problem overlay keeps the problem, restores playback, records the outcome', () => {
+    let s = run([{ type: 'interrupt/open' }, { type: 'interrupt/ask', threadId: 't1', question: 'q', targets: [] },
+      { type: 'error', error: { kind: 'offline', message: 'x' }, retry: { kind: 'thread', id: 't1' } }], teaching())
+    expect(s.overlay).toMatchObject({ kind: 'problem', prev: { kind: 'interrupt', threadId: 't1' } })
+    s = reduce(s, { type: 'interrupt/close', outcome: 'clear' })
+    expect(s.overlay).toEqual({ kind: 'problem', error: { kind: 'offline', message: 'x' }, retry: { kind: 'thread', id: 't1' } })
+    expect(s.playback).toEqual({ track: 'lesson' })
+    expect(s.threads[0]?.outcome).toBe('clear')
+    expect(reduce(s, { type: 'error/clear' }).overlay).toBeNull()
+  })
+
+  test('late seg/beat, seg/check, seg/done on a complete or failed segment are ignored', () => {
+    const s = teaching()
+    expect(reduce(s, { type: 'seg/beat', key: 'seg:1', beat: beat('seg:1', 9) })).toBe(s)
+    expect(reduce(s, { type: 'seg/check', key: 'seg:1', check: check('zz') })).toBe(s)
+    const f = reduce(s, { type: 'seg/failed', key: 'seg:1', error: { kind: 'aborted', message: 'x' } })
+    expect(reduce(f, { type: 'seg/done', key: 'seg:1', summary })).toBe(f)
+    expect(reduce(f, { type: 'seg/beat', key: 'seg:1', beat: beat('seg:1', 9) })).toBe(f)
   })
 
   test('seg/regenerate resets a segment to pending, regenerated, cleared', () => {
