@@ -17,6 +17,8 @@ export type Placed = {
   action: Checked
   box: Box
   beatId: string
+  /** Position of this item's action within its beat's `actions` (unplaced and dropped actions leave gaps). */
+  actionIndex: number
   ink: 'lesson' | 'answer'
   region: Region
   parent?: string

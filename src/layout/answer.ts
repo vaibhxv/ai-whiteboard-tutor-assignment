@@ -18,11 +18,11 @@ export function layoutAnswer(beats: Beat[], m: Measurer, vp: Viewport): { panel:
   const items: Placed[] = []
   let y = panel.y + GAP
   for (const beat of beats) {
-    for (const a of beat.actions) {
+    for (const [actionIndex, a] of beat.actions.entries()) {
       if (a.t !== 'write' && a.t !== 'math' && a.t !== 'step' && a.t !== 'solutions') continue
       const size = m.measure(a, colW)
       const box = { x, y, w: Math.min(Math.max(0, size.w), colW), h: size.h }
-      items.push({ id: a.id, action: a, box, beatId: beat.id, ink: beat.ink, region: 'notes' })
+      items.push({ id: a.id, action: a, box, beatId: beat.id, actionIndex, ink: beat.ink, region: 'notes' })
       y += size.h + GAP
     }
   }

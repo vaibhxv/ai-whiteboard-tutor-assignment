@@ -88,18 +88,10 @@ export function Board(props: BoardProps) {
   const { notes, labels } = useMemo(() => layoutNotes(shown, lw, lh, params), [shown, lw, lh, params])
   const reduced = useMemo(prefersReducedMotion, [])
 
-  // Each non-reprise item of the animating beat maps back to its action's position in the beat.
   const animIndex = useMemo(() => {
     const m = new Map<string, number>()
     if (!animating) return m
-    let n = 0
-    for (const it of shown) {
-      if (it.beatId !== animating.beatId || it.reprise) continue
-      const mark = /~m(\d+)$/.exec(it.id)
-      const i = mark ? Number(mark[1]) : n
-      m.set(it.id, i)
-      n = i + 1
-    }
+    for (const it of shown) if (it.beatId === animating.beatId && !it.reprise) m.set(it.id, it.actionIndex)
     return m
   }, [shown, animating])
   const animOf = useCallback(

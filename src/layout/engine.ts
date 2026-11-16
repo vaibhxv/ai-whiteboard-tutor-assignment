@@ -96,13 +96,15 @@ function placeBeat(b: Build, beat: BeatLike, m: Measurer, vp: Viewport, force: b
   const find = (id: string): Placed | undefined =>
     items.find((p) => p.id === id && p.region !== 'overlay') ??
     b.page.items.find((p) => p.id === id && p.region !== 'overlay')
+  let actionIndex = 0
   const put = (a: Checked, id: string, box: Box, region: Placed['region'], extra: Partial<Placed> = {}) =>
-    items.push({ id, action: a, box, beatId: beat.id, ink: beat.ink, region, ...extra })
+    items.push({ id, action: a, box, beatId: beat.id, actionIndex, ink: beat.ink, region, ...extra })
 
   let cursor = b.cursor
   let figureTaken = b.figureTaken
   for (const s of slots) {
     const a = s.a
+    actionIndex = s.i
     if (s.kind === 'figure' && b.geo.figure && 'id' in a) {
       figureTaken = true
       put(a, a.id, { x: s.x, y: b.geo.figure.y, w: s.w, h: s.h }, 'figure')

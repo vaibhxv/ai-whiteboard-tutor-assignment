@@ -45,16 +45,32 @@ describe('draw-on animation', () => {
     const { container } = render(<Board {...base({ visibleBeats: upto, animating: { beatId: target.id, timing: t }, playToken: 1 })} />)
     const mine = pages[0]!.items.filter((i) => i.beatId === target.id && !i.reprise && i.region !== 'inplot')
     expect(mine.length).toBeGreaterThan(0)
-    mine.forEach((it, n) => {
+    for (const it of mine) {
       const el = container.querySelector(`[data-el="${it.id}"]`)!
-      const cls = el.getAttribute('class') ?? ''
-      expect(cls, it.id).toMatch(/anim-(wipe|stroke|plot|fade)/)
-      const k = it.action.t === 'mark' ? Number(it.id.split('~m')[1]) : n
+      expect(el.getAttribute('class') ?? '', it.id).toMatch(/anim-(wipe|stroke|plot|fade)/)
+      const k = target.actions.indexOf(it.action)
+      expect(k, it.id).toBeGreaterThanOrEqual(0)
       expect((el as HTMLElement | SVGElement).style.getPropertyValue('--delay'), it.id).toBe(`${t.actionDelays[k]}ms`)
-    })
+    }
     const earlier = pages[0]!.items.filter((i) => upto.has(i.beatId) && i.beatId !== target.id && i.region !== 'inplot')
     expect(earlier.length).toBeGreaterThan(0)
     for (const it of earlier) expect(container.querySelector(`[data-el="${it.id}"]`)!.getAttribute('class')).not.toMatch(/anim-/)
+  })
+
+  test('skipped actions (page, dropped mark) do not shift later elements', () => {
+    const chk = { verify: { status: 'unchecked' as const } }
+    const acts = [
+      { t: 'page', ...chk }, { t: 'write', id: 'w1', text: 'one', ...chk },
+      { t: 'mark', kind: 'circle', target: 'ghost', ...chk }, { t: 'math', id: 'm1', latex: 'x', ...chk },
+    ] as unknown as Beat['actions']
+    const b: Beat = { id: 'z#0', say: '', ink: 'lesson', actions: acts }
+    const idx = new Map<string, Action>(acts.flatMap((a) => ('id' in a ? [[a.id, a] as [string, Action]] : [])))
+    const pg = paginate([{ segKey: 'z', template: 'notes', beats: [b] }], fake, 'wide')
+    const t: BeatTiming = { actionDelays: [0, 111, 222, 333], actionDurations: [1, 2, 3, 4], total: 400 }
+    const { container } = render(<Board {...base({ pages: pg, index: idx, visibleBeats: new Set(['z#0']), animating: { beatId: 'z#0', timing: t }, playToken: 1 })} />)
+    const delay = (id: string) => (container.querySelector(`[data-el="${id}"]`) as HTMLElement).style.getPropertyValue('--delay')
+    expect(delay('w1')).toBe('111ms')
+    expect(delay('m1')).toBe('333ms')
   })
 
   test('animStyle returns --delay and --d', () => {
