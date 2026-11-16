@@ -1,0 +1,63 @@
+.board-outer { position: relative; width: 100%; overflow: hidden; background: var(--board-bg); border-radius: 12px; }
+.board { position: absolute; left: 0; top: 0; transform-origin: top left; color: var(--ink); }
+.layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.layer-svg { pointer-events: none; overflow: visible; }
+.layer-svg .el { pointer-events: auto; }
+.answer-panel { position: absolute; border: 2px dashed var(--ink-answer); border-radius: 12px; opacity: .5; }
+
+.el { position: absolute; font-family: 'Playpen Sans', 'Comic Sans MS', cursive; color: var(--ink); }
+svg .el { position: static; }
+.el.ink-answer { color: var(--ink-answer); }
+.el:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+svg .el:focus-visible { outline: none; }
+.focus-ring { fill: none; stroke: none; }
+svg .el:focus-visible .focus-ring, svg .el.is-selected .focus-ring { stroke: var(--focus); stroke-width: 3; }
+.el.is-selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+svg .el.is-selected { outline: none; }
+.el .fit { transform-origin: top left; }
+
+.el-write { font-size: 26px; line-height: 1.3; }
+.el-write.role-title .write-text { text-decoration: underline wavy; text-underline-offset: 6px; text-decoration-thickness: 1px; }
+.el-write.role-note .write-text { opacity: .8; }
+.write-text { overflow-wrap: anywhere; }
+
+.math-line { font-size: 26px; }
+.el-math, .el-step { font-size: 26px; line-height: 1.3; }
+.step-why { font-size: 18px; line-height: 1.2; opacity: .85; }
+
+.board-table { border-collapse: collapse; font-size: 22px; line-height: 1.2; }
+.board-table th, .board-table td { border: 2px solid currentColor; padding: 4px 14px; text-align: center; }
+.board-table th { font-weight: 400; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+.el-explore { font-size: 18px; }
+.explore-prompt { height: 36px; line-height: 1.2; font-size: 16px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.explore-controls { position: absolute; left: 0; right: 0; bottom: 0; }
+.explore-param { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 var(--explore-pad, 36px); }
+.explore-param input { width: 100%; accent-color: var(--accent); }
+
+.badge { position: absolute; font: 600 12px/14px system-ui, sans-serif; white-space: nowrap; }
+.badge-ok { left: calc(100% + 6px); top: 2px; color: var(--ok); font-size: 18px; line-height: 20px; }
+.badge-warn { left: 0; top: calc(100% + 1px); color: var(--warn); }
+.badge-muted { left: 0; top: calc(100% + 1px); color: var(--ink); opacity: .7; font-weight: 400; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+svg text { font-family: system-ui, sans-serif; fill: currentColor; }
+.stroke { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mark-stroke { stroke: var(--accent); stroke-width: 3; }
+.ink-answer .mark-stroke { stroke: var(--ink-answer); }
+.curve { stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.fn-0 { stroke: var(--accent); color: var(--accent); }
+.fn-1 { stroke: var(--danger); color: var(--danger); }
+.fn-2 { stroke: var(--ok); color: var(--ok); }
+.fn-3 { stroke: var(--warn); color: var(--warn); }
+text.legend { fill: currentColor; stroke: var(--board-bg); stroke-width: 4px; paint-order: stroke; font-size: 15px; }
+.tick-label { font-size: 13px; opacity: .85; }
+svg text.svg-note { stroke: var(--board-bg); stroke-width: 4px; paint-order: stroke; }
+.svg-note { font-family: 'Playpen Sans', 'Comic Sans MS', cursive; font-size: 16px; }
+.svg-warn { font-size: 12px; font-weight: 600; fill: var(--warn); }
+.point-dot { fill: var(--accent); stroke: var(--board-bg); stroke-width: 2; }
+.guide-line { stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 6 5; opacity: .6; }
+.mark-note { font-family: 'Playpen Sans', 'Comic Sans MS', cursive; font-size: 18px; line-height: 1.25; color: var(--accent); }
+.ink-answer .mark-note { color: var(--ink-answer); }
+
+@media (prefers-reduced-motion: reduce) { .board * { transition: none !important; animation: none !important; } }
