@@ -129,6 +129,41 @@ describe('Checkpoint', () => {
     expect(document.body.textContent).not.toMatch(/Correct/)
   })
 
+  test('choice: B wrong, then A, then B again can be checked again', async () => {
+    const u = userEvent.setup()
+    const f = setup(choice)
+    const check = () => u.click(screen.getByRole('button', { name: 'Check' }))
+    await u.click(screen.getByLabelText('Beta')); await check()
+    await u.click(screen.getByLabelText('Alpha'))
+    await u.click(screen.getByLabelText('Beta'))
+    expect((screen.getByRole('button', { name: 'Check' }) as HTMLButtonElement).disabled).toBe(false)
+    await check()
+    expect(f.onAnswer).toHaveBeenCalledTimes(2)
+  })
+
+  test('number: 9, then 10, then 9 again can be checked again; unchanged resubmit is blocked', async () => {
+    const u = userEvent.setup()
+    const f = setup(num)
+    const box = screen.getByLabelText('Your answer')
+    const check = () => u.click(screen.getByRole('button', { name: 'Check' }))
+    await u.type(box, '9'); await check()
+    expect((screen.getByRole('button', { name: 'Check' }) as HTMLButtonElement).disabled).toBe(true)
+    await u.clear(box); await u.type(box, '10')
+    await u.clear(box); await u.type(box, '9'); await check()
+    expect(f.onAnswer).toHaveBeenCalledTimes(2)
+  })
+
+  test('empty number input tells the learner what to do', () => {
+    setup(num)
+    expect(screen.getByText('Type your answer first')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Check' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  test('number input allows a minus sign on mobile keyboards', () => {
+    setup(num)
+    expect(screen.getByLabelText('Your answer').getAttribute('inputmode')).toBe('text')
+  })
+
   test('feedback region receives focus after submit', async () => {
     const u = userEvent.setup()
     setup(num)
@@ -139,17 +174,33 @@ describe('Checkpoint', () => {
 })
 
 describe('Explore slider', () => {
-  test('ArrowRight changes the value by step and updates aria-valuetext', () => {
-    const a = { t: 'explore', id: 'e', x: [-5, 5], y: [-5, 5], expr: 'a*x', prompt: 'Try', params: [{ name: 'a', min: 0, max: 10, start: 2 }], verify: { status: 'unchecked' } }
-    const item = { id: 'e', action: a, box: { x: 0, y: 0, w: 400, h: 300 }, beatId: 'b', actionIndex: 0, region: 'main', ink: 'lesson' } as never
-    const seen: number[] = []
-    const { rerender } = render(<ExploreControls item={item} index={new Map()} selected={false} onSelect={() => {}} label="x" values={{ a: 2 }} onParam={(_, v) => seen.push(v)} />)
-    const s = screen.getByRole('slider')
+  const a = { t: 'explore', id: 'e', x: [-5, 5], y: [-5, 5], expr: 'a*x', prompt: 'Try', params: [{ name: 'a', min: 0, max: 10, start: 2 }], verify: { status: 'unchecked' } }
+  const item = { id: 'e', action: a, box: { x: 0, y: 0, w: 400, h: 300 }, beatId: 'b', actionIndex: 0, region: 'main', ink: 'lesson' } as never
+  const el = (v: number) => <ExploreControls item={item} index={new Map()} selected={false} onSelect={() => {}} label="x" values={{ a: v }} onParam={() => {}} />
+
+  test('accessible name is the param name; aria-valuetext carries the value', () => {
+    render(el(2))
+    const s = screen.getByRole('slider', { name: 'a' })
     expect(s.getAttribute('aria-valuetext')).toBe('a = 2')
-    fireEvent.keyDown(s, { key: 'ArrowRight' })
-    expect(seen[0]).toBeCloseTo(2.05)
-    rerender(<ExploreControls item={item} index={new Map()} selected={false} onSelect={() => {}} label="x" values={{ a: seen[0]! }} onParam={() => {}} />)
-    expect(screen.getByRole('slider').getAttribute('aria-valuetext')).toBe('a = 2.05')
-    expect(screen.getByText('a = 2.05')).toBeTruthy()
+  })
+
+  test('arrow, Home/End and Page keys do not reach global handlers; other keys do', () => {
+    render(el(2))
+    const seen: string[] = []
+    const h = (e: KeyboardEvent) => seen.push(e.key)
+    window.addEventListener('keydown', h)
+    const s = screen.getByRole('slider')
+    for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']) fireEvent.keyDown(s, { key })
+    expect(seen).toEqual([])
+    fireEvent.keyDown(s, { key: 'm' })
+    expect(seen).toEqual(['m'])
+    window.removeEventListener('keydown', h)
+  })
+
+  test('does not hijack native handling (no preventDefault)', () => {
+    render(el(2))
+    const ev = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
+    screen.getByRole('slider').dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(false)
   })
 })

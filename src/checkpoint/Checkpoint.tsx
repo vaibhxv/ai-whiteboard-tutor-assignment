@@ -75,7 +75,14 @@ export function Checkpoint(p: CheckpointProps) {
   }
   const resp = current()
   const ready = !rate && resp !== undefined && !(check.kind !== 'choice' && check.kind !== 'tap' && check.kind !== 'set' && text.trim() === '')
-  const submitDisabled = !ready || answered || (resp !== undefined && JSON.stringify(resp) === sentKey)
+  const respKey = resp === undefined ? undefined : JSON.stringify(resp)
+  const submitDisabled = !ready || answered || (respKey !== undefined && respKey === sentKey)
+  // Any change to the response releases the same-answer guard (B, A, B must work); a held Enter or double click
+  // with nothing changed stays blocked by lastKey/sentKey.
+  useEffect(() => {
+    if (respKey !== sentKey) { lastKey.current = undefined; setSentKey(undefined) }
+  }, [respKey, sentKey])
+
   const doSubmit = () => { if (resp && !submitDisabled) submit(resp) }
 
   const attempts = Math.max(record?.attempts ?? 0, wrongs)
@@ -112,6 +119,9 @@ export function Checkpoint(p: CheckpointProps) {
       </div>
       {hint && !rate ? <p className="cp-hint">Hint: {check.hint}</p> : null}
 
+      {!rate && !ready && (check.kind === 'number' || check.kind === 'expr') && text.trim() === '' ? (
+        <p className="cp-empty" id={`${check.id}-empty`}>Type your answer first</p>
+      ) : null}
       <div className="cp-actions">
         {!rate ? <button type="button" onClick={doSubmit} disabled={submitDisabled}>Check</button> : null}
         {(answered || (rate && grade)) && !done ? (

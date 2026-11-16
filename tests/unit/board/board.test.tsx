@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import type { Action } from '../../../src/actions'
 import { Board } from '../../../src/board/Board'
@@ -93,5 +93,41 @@ describe('Board', () => {
     const { container } = render(<Board {...props(pg, idx, new Set(['b#0']))} />)
     expect(container.querySelector('img')).toBeNull()
     expect(container.textContent).toContain(evil)
+  })
+})
+
+describe('Board explore sliders', () => {
+  const text = [
+    '{"t":"say","text":"Try the slider."}',
+    '{"t":"explore","id":"ex","x":[-5,5],"y":[-5,5],"expr":"a*x","prompt":"Move a","params":[{"name":"a","min":0,"max":10,"start":2}]}',
+  ].join('\n')
+  const { index, beats, pages } = build(text)
+  const all = new Set(beats.map((b) => b.id))
+  const curve = (c: HTMLElement) => Array.from(c.querySelectorAll('.explore-figure path')).map((p) => p.getAttribute('d')).join('|')
+
+  test('controlled: edits call onParamChange and the value follows the prop', () => {
+    const calls: unknown[][] = []
+    const mk = (a: number) => (
+      <Board {...props(pages, index, all)} params={{ ex: { a } }} onParamChange={(...x) => calls.push(x)} />
+    )
+    const { container, rerender } = render(mk(2))
+    const s = screen.getByRole('slider', { name: 'a' }) as HTMLInputElement
+    expect(s.value).toBe('2')
+    fireEvent.change(s, { target: { value: '5' } })
+    expect(calls).toEqual([['ex', 'a', 5]])
+    expect((screen.getByRole('slider', { name: 'a' }) as HTMLInputElement).value).toBe('2') // parent has not accepted yet
+    const before = curve(container)
+    rerender(mk(5))
+    expect((screen.getByRole('slider', { name: 'a' }) as HTMLInputElement).value).toBe('5')
+    expect(screen.getByText('a = 5')).toBeTruthy()
+    expect(curve(container)).not.toBe(before)
+  })
+
+  test('uncontrolled: the slider updates itself and the curve recomputes', () => {
+    const { container } = render(<Board {...props(pages, index, all)} />)
+    const before = curve(container)
+    fireEvent.change(screen.getByRole('slider', { name: 'a' }), { target: { value: '6' } })
+    expect((screen.getByRole('slider', { name: 'a' }) as HTMLInputElement).value).toBe('6')
+    expect(curve(container)).not.toBe(before)
   })
 })

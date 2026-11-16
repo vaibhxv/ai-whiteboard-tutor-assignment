@@ -37,6 +37,14 @@ const bad = (message: string): GradeOutcome => ({ result: 'invalid', message })
 
 /** Pure grading. Invalid input is returned as such and must not count as an attempt. Never throws. */
 export function gradeCheck(check: CheckAction, response: CheckResponse): GradeOutcome {
+  try {
+    return gradeInner(check, response)
+  } catch {
+    return bad('I couldn’t read that — try writing it differently')
+  }
+}
+
+function gradeInner(check: CheckAction, response: CheckResponse): GradeOutcome {
   if (response.kind === 'rate') return { result: 'correct', branch: response.value }
   if (response.kind !== check.kind) return bad('That answer does not fit this question.')
   switch (check.kind) {

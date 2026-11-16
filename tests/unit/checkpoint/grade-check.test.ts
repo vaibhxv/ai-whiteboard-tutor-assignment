@@ -50,6 +50,31 @@ describe('gradeCheck expr', () => {
   })
 })
 
+describe('gradeCheck real-world notation', () => {
+  const e: CheckAction = { ...base, kind: 'expr', answer: '12', variable: 'x' }
+  test('expr path: 3×4, −3, 3/4 and x² are graded without throwing', () => {
+    expect(gradeCheck(e, { kind: 'expr', text: '3×4' })).toMatchObject({ result: 'correct' })
+    expect(gradeCheck({ ...e, answer: '-3' }, { kind: 'expr', text: '−3' })).toMatchObject({ result: 'correct' })
+    expect(gradeCheck({ ...e, answer: '0.75' }, { kind: 'expr', text: '3/4' })).toMatchObject({ result: 'correct' })
+    expect(gradeCheck({ ...e, answer: 'x^2' }, { kind: 'expr', text: 'x²' })).toMatchObject({ result: 'correct' })
+  })
+  test('number path: −3 and 3/4', () => {
+    expect(gradeCheck({ ...num, answer: '-3', anticipated: undefined }, { kind: 'number', text: '−3' })).toMatchObject({ result: 'correct' })
+    expect(gradeCheck({ ...num, answer: '0.75', anticipated: undefined }, { kind: 'number', text: '3/4' })).toMatchObject({ result: 'correct' })
+  })
+  test.each(['number', 'expr'] as const)('%s: empty and whitespace-only are invalid with a message', (kind) => {
+    for (const text of ['', '   ', '\t\n']) {
+      expect(gradeCheck(kind === 'number' ? num : expr, { kind, text })).toMatchObject({ result: 'invalid', message: expect.stringMatching(/couldn.t read that/) })
+    }
+  })
+  test('large garbage table never throws', () => {
+    const junk = ['(((', ')))', '1/0', '0/0', 'x^x^x^x^x^x', '9'.repeat(400), '\u0000', '<script>', '2x+', '=', '==', '∞', 'sqrt(', '1e999', '🙂', '2^(2^(2^(2^9)))', 'a'.repeat(5000)]
+    for (const text of junk) for (const c of [num, expr]) {
+      expect(() => gradeCheck(c, { kind: c.kind as 'number', text })).not.toThrow()
+    }
+  })
+})
+
 describe('gradeCheck other kinds', () => {
   test('choice', () => {
     expect(gradeCheck(choice, { kind: 'choice', optionId: 'a' })).toEqual({ result: 'correct', branch: 'a' })

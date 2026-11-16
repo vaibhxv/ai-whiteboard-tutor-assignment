@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Action } from '../../actions'
 import { EXPLORE_PARAM_H } from '../../layout/constants'
 import { plotArea } from '../../layout/plot-transform'
@@ -18,7 +18,6 @@ export const startValues = (a: Exp): ParamValues => Object.fromEntries(a.params.
 /** HTML half of an explore figure: the prompt and one slider per param, under the plot area. */
 export function ExploreControls(p: ElProps & { values: ParamValues; onParam(name: string, v: number): void }) {
   const a = p.item.action as Exp
-  const uid = useId().replace(/:/g, '')
   const { values, onParam, ...rest } = p
   return (
     <HtmlRoot {...rest} role="group" className="el-explore">
@@ -28,18 +27,14 @@ export function ExploreControls(p: ElProps & { values: ParamValues; onParam(name
           const v = values[q.name] ?? q.start
           return (
             <label key={q.name} className="explore-param" style={{ height: EXPLORE_PARAM_H }}>
-              <span className="explore-name" id={`${uid}-${q.name}`}>{q.name} = {fmtNum(v)}</span>
+              <span className="explore-name">{q.name} = {fmtNum(v)}</span>
               <input
                 type="range" min={q.min} max={q.max} step={(q.max - q.min) / 200} value={v}
-                aria-labelledby={`${uid}-${q.name}`}
+                aria-label={q.name}
                 aria-valuetext={`${q.name} = ${fmtNum(v)}`}
                 onKeyDown={(e) => {
-                  const step = (q.max - q.min) / 200
-                  const dir = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0
-                  if (dir === 0) return
-                  e.preventDefault()
-                  e.stopPropagation()
-                  onParam(q.name, Math.min(q.max, Math.max(q.min, v + dir * step)))
+                  // Native range handling does the work; keep global player shortcuts from also firing.
+                  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) e.stopPropagation()
                 }}
                 onChange={(e) => onParam(q.name, Number(e.target.value))}
                 onClick={(e) => e.stopPropagation()}
