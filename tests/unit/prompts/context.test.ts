@@ -5,7 +5,7 @@ import type { LessonEvent } from '../../../src/lesson/events'
 import type { LessonState } from '../../../src/lesson/types'
 import { buildUserMessage, listBoard } from '../../../src/prompts/context'
 import { ROLE_CAPS } from '../../../src/prompts/roles'
-import { EXAMPLE_SEGMENT } from '../../../src/prompts/system'
+import { EXAMPLE_SEGMENT, SYSTEM_PROMPT } from '../../../src/prompts/system'
 import { fill, run } from '../lesson/helpers'
 import { lessonWith } from './helpers'
 
@@ -247,6 +247,33 @@ describe('buildUserMessage', () => {
       expect(count(m, '<learner_text>'), role).toBe(role === 'plan' || role === 'answer' ? 1 : 0)
       expect(block(m, 'task'), role).toMatch(/JSON/)
     }
+  })
+})
+
+describe('fix round 1: wording', () => {
+  test('tap hint spreads the figure over two says and never asks for more than 3 actions after one say', () => {
+    const { state } = lessonWith(EXAMPLE_SEGMENT)
+    const s = { ...state, plan: state.plan.map((p) => (p.n === 2 ? { ...p, check: 'tap' as const } : p)) }
+    const task = block(buildUserMessage('segment', { state: s, n: 2 }), 'task')
+    expect(task).toMatch(/two says/)
+    expect(task).toMatch(/plot/)
+    expect(task).not.toMatch(/plot with 3 unlabelled candidate points/)
+    expect(SYSTEM_PROMPT).toMatch(/tap:[^\n]*2–3 unlabelled/)
+    expect(SYSTEM_PROMPT).not.toContain('2–4 unlabelled')
+  })
+
+  test('answer "differently" never asks for a new plot (answer mode has none)', () => {
+    const { state } = lessonWith(EXAMPLE_SEGMENT)
+    const task = block(buildUserMessage('answer', { state, question: 'q', targets: [], followUp: 'differently' }), 'task')
+    expect(task).not.toMatch(/picture on a plot/)
+    expect(task).toMatch(/existing plot/)
+    expect(task).toMatch(/never a new plot/i)
+  })
+
+  test('segment task asks for math lines with expr and step lines with from, even in a graph segment', () => {
+    const { state } = lessonWith(EXAMPLE_SEGMENT)
+    const task = block(buildUserMessage('segment', { state, n: 1 }), 'task')
+    expect(task).toContain('Even in a graph segment, state any formula or equation you rely on as a `math` line with `expr`, and write derivations as `step` lines with `from` and `expr`.')
   })
 })
 

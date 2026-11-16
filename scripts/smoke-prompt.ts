@@ -5,11 +5,13 @@
  *   1. plan    "Why is the vertex of a parabola halfway between its roots?"  → createRecordStream('plan')
  *   2. segment n = 1, built from that plan                                   → createBoardPipeline('board')
  *   3. answer  "why halfway?" against segment 1's board                      → createBoardPipeline('answer')
+ *   4. segment n = 2 (and the plan's first "worked" segment if different), after segment 1's checkpoint
+ *      is answered right                                                     → createBoardPipeline('board')
  * and prints a summary per call. Raw outputs are written to outDir (default: a fresh temp dir).
  * With --extended it also runs reteach (a wrong answer at the segment 1 checkpoint) and recap.
  */
 import { spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Action, PlanRecord } from '../src/actions'
@@ -32,9 +34,12 @@ const CALL_TIMEOUT_MS = 240_000
 
 type CallResult = { text: string; raw: string; stop: StopReason; ttfMs: number | null; totalMs: number; usage?: unknown; stderr: string }
 
+const ENV_ALLOW = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM', 'CLAUDE_CONFIG_DIR']
+
+/** Child env from an allowlist only (no API keys or parent-session variables can leak in). */
 function claudeEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env }
-  for (const k of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT']) delete env[k]
+  const env: NodeJS.ProcessEnv = {}
+  for (const k of ENV_ALLOW) if (process.env[k] !== undefined) env[k] = process.env[k]
   env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = '1'
   return env
 }
@@ -89,9 +94,11 @@ function runClaude(user: string, onText: (t: string) => void): Promise<CallResul
     })
     child.stderr.setEncoding('utf8')
     child.stderr.on('data', (d: string) => { stderr += d })
-    child.on('error', (err) => { clearTimeout(timer); fail(err) })
+    const cleanup = () => rmSync(cwd, { recursive: true, force: true })
+    child.on('error', (err) => { clearTimeout(timer); cleanup(); fail(err) })
     child.on('close', (code) => {
       clearTimeout(timer)
+      cleanup()
       handle(buf)
       const stop: StopReason = code !== 0 ? 'aborted' : stopReason === 'max_tokens' ? 'length' : 'end'
       done({ text, raw, stop, ttfMs, totalMs: Date.now() - t0, usage, stderr })
@@ -101,6 +108,14 @@ function runClaude(user: string, onText: (t: string) => void): Promise<CallResul
 }
 
 type Summary = Record<string, unknown>
+
+/** math/step lines that carry expr: how many verified pass, unchecked or fail. */
+function mathShare(beats: Beat[]): string {
+  const ms = beats.flatMap((b) => b.actions).filter((a) => (a.t === 'math' || a.t === 'step') && a.expr !== undefined)
+  const n = (st: string) => ms.filter((a) => a.verify.status === st).length
+  const noExpr = beats.flatMap((b) => b.actions).filter((a) => a.t === 'math' && a.expr === undefined).length
+  return `${ms.length} with expr: ${n('pass')} pass, ${n('unchecked')} unchecked, ${n('fail')} fail; ${noExpr} math without expr`
+}
 
 function fmtMs(ms: number | null): string {
   return ms === null ? 'n/a' : `${(ms / 1000).toFixed(1)}s`
@@ -200,13 +215,14 @@ async function main() {
   save('segment-1', segUser, segRun)
   apply(segEvents)
   const longSays = seg.beats.filter((b) => b.say.trim().split(/\s+/).length > 22).length
+  const segMath = mathShare(seg.beats)
   summaries.segment = {
     records: segSum.accepted + segSum.rejected, accepted: segSum.accepted, rejected: segSum.rejected,
     failed: segSum.failed.length, hasCheck: segSum.hasCheck, beats: seg.beats.length, asks: seg.asks.length,
     passed: seg.beats.flatMap((b) => b.actions).filter((a) => a.verify.status === 'pass').length,
     unchecked: seg.beats.flatMap((b) => b.actions).filter((a) => a.verify.status === 'unchecked').length,
     checkKind: state.segments['seg:1']?.check?.kind, checkVerify: state.segments['seg:1']?.check?.verify.status,
-    saysOver22: longSays, stop: segRun.stop, truncated: segSum.truncated,
+    mathStep: segMath, saysOver22: longSays, stop: segRun.stop, truncated: segSum.truncated,
     timeToFirstText: fmtMs(segRun.ttfMs), total: fmtMs(segRun.totalMs), outputTokens: usageOf(segRun, 'segment'),
   }
   printSummary('segment 1', summaries.segment, seg.rejects,
@@ -236,7 +252,41 @@ async function main() {
   printSummary('answer', summaries.answer, ans.rejects,
     ansSum.failed.map((f) => ({ id: 'id' in f ? String(f.id) : undefined, t: f.t, evidence: f.verify.evidence })))
 
+  // 4. segment 2 (and the first worked segment): seg 1 answered right at its checkpoint first -------------
   const extraRejects: Record<string, { line: string; reason: string }[]> = {}
+  if (state.plan.length >= 2) {
+    state = atSegEnd
+    for (let i = 0; i < 40 && state.phase !== 'checkpoint'; i++) apply([{ type: 'player/advance' }])
+    const c1 = state.segments['seg:1']?.check
+    if (state.phase === 'checkpoint' && c1) {
+      apply([{ type: 'check/answer', checkId: c1.id, grade: { result: 'correct', branch: 'correct' } }])
+    }
+    // Segment 2, plus the plan's first "worked" (algebra) segment if that is not segment 2.
+    const workedN = state.plan.find((p) => p.representation === 'worked')?.n
+    for (const n of workedN !== undefined && workedN !== 2 ? [2, workedN] : [2]) {
+      const key: SegKey = `seg:${n}`
+      const user = buildUserMessage('segment', { state, n })
+      const events: LessonEvent[] = [{ type: 'seg/stream', key }]
+      const g = board(key, 'board', events)
+      const r = await runClaude(user, (t) => g.p.push(t))
+      const sum = g.p.end(r.stop)
+      events.push({ type: 'seg/done', key, summary: sum })
+      save(`segment-${n}`, user, r)
+      apply(events)
+      extraRejects[`segment${n}`] = g.rejects
+      const sk = `segment${n}`
+      summaries[sk] = {
+        representation: state.plan[n - 1]?.representation, records: sum.accepted + sum.rejected, accepted: sum.accepted,
+        rejected: sum.rejected, failed: sum.failed.length, hasCheck: sum.hasCheck, beats: g.beats.length, asks: g.asks.length,
+        checkKind: state.segments[key]?.check?.kind, checkVerify: state.segments[key]?.check?.verify.status,
+        mathStep: mathShare(g.beats), stop: r.stop,
+        timeToFirstText: fmtMs(r.ttfMs), total: fmtMs(r.totalMs), outputTokens: usageOf(r, 'segment'),
+      }
+      printSummary(`segment ${n}`, summaries[sk] as Summary, g.rejects,
+        sum.failed.map((f) => ({ id: 'id' in f ? String(f.id) : undefined, t: f.t, evidence: f.verify.evidence })))
+    }
+  }
+
   if (extended) {
     // 4. reteach: a wrong answer at the segment 1 checkpoint -------------------------------------------
     state = atSegEnd
