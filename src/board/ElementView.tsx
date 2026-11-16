@@ -22,10 +22,10 @@ export type ViewCtx = {
   index: ReadonlyMap<string, Action>
   selected?: string
   onSelect(id: string): void
-  boardW: number
+  noteOf(markId: string): Box
   kidsOf(plotId: string): Placed[]
-  /** Note boxes of visible marks, which point labels steer clear of. */
-  avoid: Box[]
+  /** Laid-out label boxes of points, lines and guides, by element id. */
+  labels: ReadonlyMap<string, Box>
   params(id: string): ParamValues
   setParam(id: string, name: string, v: number): void
 }
@@ -47,11 +47,11 @@ export function HtmlElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
 export function SvgElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
   const p = { item, index: ctx.index, selected: ctx.selected === item.id, onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index) }
   switch (item.action.t) {
-    case 'plot': return <Plot {...p} kids={ctx.kidsOf(item.id)} avoid={ctx.avoid} selectedId={ctx.selected} />
+    case 'plot': return <Plot {...p} kids={ctx.kidsOf(item.id)} labels={ctx.labels} selectedId={ctx.selected} />
     case 'numberline': return <NumberLine {...p} />
-    case 'mark': return <Mark {...p} boardW={ctx.boardW} />
+    case 'mark': return <Mark {...p} note={ctx.noteOf(item.id)} />
     case 'explore':
-      return <ExploreFigure item={item} values={ctx.params(item.id)} kids={ctx.kidsOf(item.id)} avoid={ctx.avoid} index={ctx.index} selectedId={ctx.selected} onSelect={ctx.onSelect} />
+      return <ExploreFigure item={item} values={ctx.params(item.id)} kids={ctx.kidsOf(item.id)} labels={ctx.labels} index={ctx.index} selectedId={ctx.selected} onSelect={ctx.onSelect} />
     default: return null
   }
 }

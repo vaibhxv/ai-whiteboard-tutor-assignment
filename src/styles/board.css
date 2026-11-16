@@ -35,10 +35,11 @@ svg .el.is-selected { outline: none; }
 .explore-param { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 var(--explore-pad, 36px); }
 .explore-param input { width: 100%; accent-color: var(--accent); }
 
-.badge { position: absolute; font: 600 12px/14px system-ui, sans-serif; white-space: nowrap; }
-.badge-ok { left: calc(100% + 6px); top: 2px; color: var(--ok); font-size: 18px; line-height: 20px; }
-.badge-warn { left: 0; top: calc(100% + 1px); color: var(--warn); }
-.badge-muted { left: 0; top: calc(100% + 1px); color: var(--ink); opacity: .7; font-weight: 400; }
+/* The board is scaled down on small screens; --board-scale lets overlays stay readable (>= ~11 px on screen). */
+.badge { position: absolute; font: 600 min(26px, calc(11px / var(--board-scale, 1)))/1 system-ui, sans-serif; white-space: nowrap; }
+.badge-ok { left: calc(100% + 6px); top: 2px; color: var(--ok); font-size: min(32px, calc(18px / var(--board-scale, 1))); line-height: 1.1; }
+.badge-warn { left: 0; top: 100%; color: var(--warn); }
+.badge-muted { left: 0; top: 100%; color: var(--ink); opacity: .7; font-weight: 400; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 svg text { font-family: system-ui, sans-serif; fill: currentColor; }
@@ -51,10 +52,10 @@ svg text { font-family: system-ui, sans-serif; fill: currentColor; }
 .fn-2 { stroke: var(--ok); color: var(--ok); }
 .fn-3 { stroke: var(--warn); color: var(--warn); }
 text.legend { fill: currentColor; stroke: var(--board-bg); stroke-width: 4px; paint-order: stroke; font-size: 15px; }
-.tick-label { font-size: 13px; opacity: .85; }
+.tick-label { font-size: max(13px, min(22px, calc(10.5px / var(--board-scale, 1)))); opacity: .85; }
 svg text.svg-note { stroke: var(--board-bg); stroke-width: 4px; paint-order: stroke; }
 .svg-note { font-family: 'Playpen Sans', 'Comic Sans MS', cursive; font-size: 16px; }
-.svg-warn { font-size: 12px; font-weight: 600; fill: var(--warn); }
+.svg-warn { font-size: min(26px, calc(11px / var(--board-scale, 1))); font-weight: 600; fill: var(--warn); }
 .point-dot { fill: var(--accent); stroke: var(--board-bg); stroke-width: 2; }
 .guide-line { stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 6 5; opacity: .6; }
 .mark-note { font-family: 'Playpen Sans', 'Comic Sans MS', cursive; font-size: 18px; line-height: 1.25; color: var(--accent); }

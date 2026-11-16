@@ -6,7 +6,7 @@ import type { BeatTiming } from '../player/durations'
 import '../styles/board.css'
 import { HtmlElement, inHtmlLayer, inSvgLayer, isInplot, SvgElement } from './ElementView'
 import type { ViewCtx } from './ElementView'
-import { noteBox } from './elements/Mark'
+import { layoutNotes } from './notes'
 import { startValues } from './elements/Explore'
 import type { ParamValues } from './elements/Explore'
 
@@ -62,10 +62,11 @@ export function Board(props: BoardProps) {
     },
     [index, edits],
   )
-  const avoid = useMemo(() => shown.filter((i) => i.action.t === 'mark').map((i) => noteBox(i.box, lw)).map((b) => ({ ...b, y: b.y + 12, h: 34 })), [shown, lw])
+  const { notes, labels } = useMemo(() => layoutNotes(shown, lw, lh, params), [shown, lw, lh, params])
   const ctx: ViewCtx = {
-    index, selected, onSelect, boardW: lw,
-    avoid,
+    index, selected, onSelect,
+    noteOf: (id) => notes.get(id) ?? { x: 0, y: 0, w: 160, h: 50 },
+    labels,
     kidsOf: (id) => shown.filter((i) => isInplot(i) && i.parent === id),
     params,
     setParam: (id, name, v) => setEdits((e) => ({ ...e, [id]: { ...e[id], [name]: v } })),
@@ -75,7 +76,7 @@ export function Board(props: BoardProps) {
 
   return (
     <div ref={outer} className="board-outer" style={{ height: lh * s }}>
-      <div className={`board board-${viewport}`} style={{ width: lw, height: lh, transform: `scale(${s})` }}>
+      <div className={`board board-${viewport}`} style={{ width: lw, height: lh, transform: `scale(${s})`, ['--board-scale' as string]: s }}>
         {answer && <div className="answer-panel" style={{ left: answer.panel.x, top: answer.panel.y, width: answer.panel.w, height: answer.panel.h }} />}
         <div className="layer layer-html">
           {html.map((it) => <HtmlElement key={it.id} item={it} ctx={ctx} />)}

@@ -1,6 +1,6 @@
 import { useId, useMemo } from 'react'
 import type { Action } from '../../actions'
-import { placeLabel } from '../../layout/labels'
+import { intersects } from '../../layout/labels'
 import { markTargetBox } from '../../layout/marks'
 import { plotArea, plotTransform } from '../../layout/plot-transform'
 import type { Box, Placed } from '../../layout/types'
@@ -8,12 +8,14 @@ import { fmtNum } from '../../maths/format'
 import { compile, parseMath } from '../../maths/safe'
 import { describeAction } from '../describe'
 import { samplePath } from '../plot/sample'
+import { axisPos, labelSize, placeAround, plotGeometry } from '../plot/geometry'
+import type { PlotFn, PlotGeo } from '../plot/geometry'
 import { niceTicks } from '../plot/ticks'
 import { roughPaths, seedOf } from '../rough'
 import { SvgRoot } from './shared'
 import type { ElProps } from './shared'
 
-export type PlotFn = { id: string; f: (x: number) => number; label?: string }
+export type { PlotFn }
 type Kid = Extract<Action, { t: 'point' | 'line' | 'guide' }>
 
 /** Compile an expression of x (plus any `scope` params) to a function; NaN everywhere if it will not parse. */
@@ -24,16 +26,10 @@ export function compileFn(expr: string, scope: Record<string, number> = {}): (x:
   return (x) => f({ ...scope, x })
 }
 
-const LABEL_H = 20
-const labelSize = (s: string) => ({ w: s.length * 8.5 + 8, h: LABEL_H })
 const POINT_BOX = 16
 
 function Axes({ id, area, x, y }: { id: string; area: Box; x: [number, number]; y: [number, number] }) {
-  const { toPx, inner } = plotTransform(area, x, y)
-  const clampX = (v: number) => Math.min(Math.max(v, inner.x), inner.x + inner.w)
-  const clampY = (v: number) => Math.min(Math.max(v, inner.y), inner.y + inner.h)
-  const ax = clampX(toPx([0, 0])[0])
-  const ay = clampY(toPx([0, 0])[1])
+  const { toPx, inner, ax, ay } = axisPos(area, x, y)
   const crossAtOrigin = x[0] <= 0 && 0 <= x[1] && y[0] <= 0 && 0 <= y[1]
   const xt = niceTicks(x[0], x[1])
   const yt = niceTicks(y[0], y[1])
@@ -69,18 +65,24 @@ function Axes({ id, area, x, y }: { id: string; area: Box; x: [number, number]; 
   )
 }
 
-/** Label boxes for points/lines/guides, laid out together so they avoid each other and the dots. */
-function layoutLabels(kids: Placed[], area: Box, a: { x: [number, number]; y: [number, number] }, avoid: Box[]): Map<string, Box> {
+/** Obstacles shared by everything placed on one plot. */
+export type Avoid = { shapes: Box[]; notes: Box[] }
+const contains = (b: Box, [x, y]: [number, number]) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h
+const GAP_AROUND = 4
+
+/** Label boxes for points/lines/guides, laid out together so they avoid axes, the curve, marks, notes, dots and each other. */
+export function layoutLabels(kids: Placed[], area: Box, a: { x: [number, number]; y: [number, number] }, geo: PlotGeo, avoid: Avoid): Map<string, Box> {
   const { toPx, inner } = plotTransform(area, a.x, a.y)
   const dots = new Map<string, Box>()
   const placed: Box[] = []
-  const anchors: { id: string; at: [number, number]; text: string }[] = []
+  const anchors: { id: string; at: [number, number]; text: string; own?: Box }[] = []
   for (const k of kids) {
     const c = k.action as Kid
     if (c.t === 'point') {
       const at = toPx(c.at)
-      dots.set(k.id, { x: at[0] - POINT_BOX / 2, y: at[1] - POINT_BOX / 2, w: POINT_BOX, h: POINT_BOX })
-      if (c.label) anchors.push({ id: k.id, at, text: c.label })
+      const dot = { x: at[0] - POINT_BOX / 2, y: at[1] - POINT_BOX / 2, w: POINT_BOX, h: POINT_BOX }
+      dots.set(k.id, dot)
+      if (c.label) anchors.push({ id: k.id, at, text: c.label, own: dot })
     } else if (c.t === 'line' && c.label) {
       const [x1, y1] = toPx(c.from)
       const [x2, y2] = toPx(c.to)
@@ -90,11 +92,22 @@ function layoutLabels(kids: Placed[], area: Box, a: { x: [number, number]; y: [n
       anchors.push({ id: k.id, at, text: c.label })
     }
   }
+  const legendBoxes = geo.legend.map((l) => l.box)
   const out = new Map<string, Box>()
   for (const an of anchors) {
-    // A point's own dot is not an obstacle for its own label, only the other dots, labels and mark notes are.
-    const others = [...avoid, ...[...dots].filter(([id]) => id !== an.id).map(([, d]) => d), ...placed]
-    const b = placeLabel(an.at, labelSize(an.text), others, area)
+    // A mark's shape around this anchor is cleared by inflating the label rather than treated as an obstacle.
+    const covering = avoid.shapes.filter((s) => contains(s, an.at))
+    const extra = covering.reduce((m, s) => Math.max(m, Math.max(s.w, s.h) / 2 - POINT_BOX / 2), 0)
+    const e = GAP_AROUND + Math.max(0, extra)
+    const ownDot = an.own
+    const curve = ownDot ? geo.curve.filter((c) => !intersects(c, { x: ownDot.x - 10, y: ownDot.y - 10, w: ownDot.w + 20, h: ownDot.h + 20 })) : geo.curve
+    const others = [
+      ...geo.structure, ...curve, ...legendBoxes, ...avoid.notes,
+      ...avoid.shapes.filter((s) => !covering.includes(s)),
+      ...[...dots].filter(([id]) => id !== an.id).map(([, d]) => d), ...placed,
+    ]
+    const size = labelSize(an.text)
+    const b = placeAround(an.at, size, others, area, [e, Math.max(extra, 0), e + 16, e + 32, e + 48])
     placed.push(b)
     out.set(an.id, b)
   }
@@ -135,11 +148,17 @@ function KidShape({ kid, area, plot, label }: { kid: Placed; area: Box; plot: { 
 }
 
 /** The drawing: axes, computed curves (clipped to the plot area) and a legend. */
-export function PlotDrawing({ id, box, x, y, fns }: { id: string; box: Box; x: [number, number]; y: [number, number]; fns: PlotFn[] }) {
+/** The curves of a plot or explore (an explore's use its current param values). */
+export function plotFns(a: Extract<Action, { t: 'plot' | 'explore' }>, values: Record<string, number> = {}): PlotFn[] {
+  return a.t === 'plot'
+    ? a.fns.map((f) => ({ id: f.id, f: compileFn(f.expr), label: f.label }))
+    : [{ id: a.id, f: compileFn(a.expr, values) }]
+}
+
+export function PlotDrawing({ id, box, x, y, fns, geo }: { id: string; box: Box; x: [number, number]; y: [number, number]; fns: PlotFn[]; geo: PlotGeo }) {
   const clip = `clip-${useId().replace(/:/g, '')}`
   const { toPx, inner } = plotTransform(box, x, y)
   const paths = useMemo(() => fns.map((fn) => samplePath(fn.f, x, y, toPx)), [fns, x, y, box]) // eslint-disable-line react-hooks/exhaustive-deps
-  const legend = fns.filter((f) => f.label)
   return (
     <>
       <Axes id={id} area={box} x={x} y={y} />
@@ -147,21 +166,18 @@ export function PlotDrawing({ id, box, x, y, fns }: { id: string; box: Box; x: [
       <g clipPath={`url(#${clip})`}>
         {paths.map((d, i) => d && <path key={fns[i]?.id ?? i} d={d} className={`curve fn-${i % 4}`} fill="none" />)}
       </g>
-      {legend.map((f, i) => (
-        <text key={f.id} x={inner.x + inner.w - 4} y={inner.y + 16 + i * 20} textAnchor="end" className={`legend fn-${fns.indexOf(f) % 4}`}>
-          {f.label}
-        </text>
+      {geo.legend.map(({ fn, box: b }) => (
+        <text key={fn.id} x={b.x} y={b.y + b.h - 5} className={`legend fn-${fns.indexOf(fn) % 4}`}>{fn.label}</text>
       ))}
     </>
   )
 }
 
 /** Points, lines and guides on a plot: each is its own focusable element, laid out against the others. */
-export function PlotKids({ plot, kids, area, avoid, index, selectedId, onSelect }: {
-  plot: Placed; kids: Placed[]; area: Box; avoid: Box[]; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
+export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect }: {
+  plot: Placed; kids: Placed[]; area: Box; labels: ReadonlyMap<string, Box>; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
 }) {
   const a = plot.action as Extract<Action, { t: 'plot' | 'explore' }>
-  const labels = useMemo(() => layoutLabels(kids, area, a, avoid), [kids, area, a, avoid])
   return (
     <>
       {kids.map((k) => (
@@ -182,17 +198,18 @@ export function PlotKids({ plot, kids, area, avoid, index, selectedId, onSelect 
   )
 }
 
-export function Plot(p: ElProps & { kids: Placed[]; avoid: Box[]; selectedId?: string }) {
-  const { kids, avoid, selectedId, ...root } = p
+export function Plot(p: ElProps & { kids: Placed[]; labels: ReadonlyMap<string, Box>; selectedId?: string }) {
+  const { kids, labels, selectedId, ...root } = p
   const a = p.item.action as Extract<Action, { t: 'plot' }>
   const fns = useMemo<PlotFn[]>(() => a.fns.map((f) => ({ id: f.id, f: compileFn(f.expr), label: f.label })), [a])
   const area = plotArea(a, p.item.box)
+  const geo = useMemo(() => plotGeometry(area, a.x, a.y, fns), [area.x, area.y, area.w, area.h, a, fns]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <SvgRoot {...root} className="el-plot">
-        <PlotDrawing id={p.item.id} box={area} x={a.x} y={a.y} fns={fns} />
+        <PlotDrawing id={p.item.id} box={area} x={a.x} y={a.y} fns={fns} geo={geo} />
       </SvgRoot>
-      <PlotKids plot={p.item} kids={kids} area={area} avoid={avoid} index={p.index} selectedId={selectedId} onSelect={p.onSelect} />
+      <PlotKids plot={p.item} kids={kids} area={area} labels={labels} index={p.index} selectedId={selectedId} onSelect={p.onSelect} />
     </>
   )
 }

@@ -4,8 +4,8 @@ import { EXPLORE_PARAM_H } from '../../layout/constants'
 import { plotArea } from '../../layout/plot-transform'
 import type { Box, Placed } from '../../layout/types'
 import { fmtNum } from '../../maths/format'
-import { compileFn, PlotDrawing, PlotKids } from './Plot'
-import type { PlotFn } from './Plot'
+import { PlotDrawing, plotFns, PlotKids } from './Plot'
+import { plotGeometry } from '../plot/geometry'
 import { HtmlRoot } from './shared'
 import type { ElProps } from './shared'
 
@@ -43,18 +43,19 @@ export function ExploreControls(p: ElProps & { values: ParamValues; onParam(name
 }
 
 /** SVG half: the live curve for the current params, plus points on it. Decorative (the HTML half is the labelled root). */
-export function ExploreFigure({ item, values, kids, avoid, index, selectedId, onSelect }: {
-  item: Placed; avoid: Box[]; values: ParamValues; kids: Placed[]; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
+export function ExploreFigure({ item, values, kids, labels, index, selectedId, onSelect }: {
+  item: Placed; labels: ReadonlyMap<string, Box>; values: ParamValues; kids: Placed[]; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
 }) {
   const a = item.action as Exp
-  const fns = useMemo<PlotFn[]>(() => [{ id: a.id, f: compileFn(a.expr, values) }], [a, values])
+  const fns = useMemo(() => plotFns(a, values), [a, values])
   const area = plotArea(a, item.box)
+  const geo = useMemo(() => plotGeometry(area, a.x, a.y, fns), [area.x, area.y, area.w, area.h, a, fns]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <g className={`explore-figure ink-${item.ink}`} aria-hidden="true">
-        <PlotDrawing id={item.id} box={area} x={a.x} y={a.y} fns={fns} />
+        <PlotDrawing id={item.id} box={area} x={a.x} y={a.y} fns={fns} geo={geo} />
       </g>
-      <PlotKids plot={item} kids={kids} area={area} avoid={avoid} index={index} selectedId={selectedId} onSelect={onSelect} />
+      <PlotKids plot={item} kids={kids} area={area} labels={labels} index={index} selectedId={selectedId} onSelect={onSelect} />
     </>
   )
 }

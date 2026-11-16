@@ -37,4 +37,18 @@ describe('samplePath', () => {
   test('empty path when nothing is finite', () => {
     expect(samplePath(() => NaN, [0, 1], [0, 1], toPx)).toBe('')
   })
+  test('a pole falling between samples never draws a spike taller than the y span', () => {
+    const span = 20
+    const check = (d: string) => {
+      let prevY: number | undefined
+      for (const tok of d.match(/[ML][-\d.]+ [-\d.]+/g) ?? []) {
+        const y = Number(tok.slice(1).split(' ')[1])
+        if (!tok.startsWith('M') && prevY !== undefined) expect(Math.abs(y - prevY)).toBeLessThanOrEqual(span * 10 + 0.5)
+        prevY = y
+      }
+    }
+    check(samplePath(fn('tan(x)'), [-10, 10], [-10, 10], toPx))
+    for (const n of [97, 100, 333, 480]) check(samplePath(fn('1/(x-0.0137)'), [-5, 5], [-10, 10], toPx, n))
+    expect(samplePath(fn('1/(x-0.0137)'), [-5, 5], [-10, 10], toPx, 100).split('M').length - 1).toBeGreaterThanOrEqual(2)
+  })
 })

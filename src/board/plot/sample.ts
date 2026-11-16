@@ -1,8 +1,9 @@
 /**
  * SVG path `d` for y = f(x) over `x`, sampled at `n` points. Never contains NaN.
  * - A non-finite value lifts the pen (the next finite sample starts a new `M`).
- * - Two consecutive samples that lie more than one y-span outside the y range on opposite sides
- *   are an asymptote: the pen lifts instead of drawing a vertical spike.
+ * - Two consecutive samples more than one y-span apart (an asymptote, or a pole that fell between
+ *   samples so that only one side is out of range) lift the pen instead of drawing a vertical spike
+ *   (unless both are clamped to the same edge, which draws flat).
  * - Every other value is clamped to the y range ± 1 span (the Plot clips to its area).
  */
 export function samplePath(
@@ -26,7 +27,7 @@ export function samplePath(
       prev = undefined
       continue
     }
-    if (pen && prev !== undefined && ((prev > hi && v < lo) || (prev < lo && v > hi))) pen = false
+    if (pen && prev !== undefined && Math.abs(v - prev) > span && !(prev > hi && v > hi) && !(prev < lo && v < lo)) pen = false
     prev = v
     const [px, py] = toPx([xv, Math.min(Math.max(v, lo), hi)])
     if (!Number.isFinite(px) || !Number.isFinite(py)) {
