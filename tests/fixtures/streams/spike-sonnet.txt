@@ -1,0 +1,20 @@
+# Real claude-sonnet-5-5 spike output. Edits: (1) the "roots" math line became a solutions action; (2) the final check gained explain and hint.
+{"t":"say","text":"Let's find where the curve y = x² − 4x + 3 crosses the x-axis, since that reveals the vertex."}
+{"t":"math","id":"eq1","latex":"y = x^2 - 4x + 3","expr":"y=x^2-4*x+3"}
+{"t":"say","text":"Set y to zero and factor: we need two numbers multiplying to 3 and adding to −4."}
+{"t":"math","id":"fac","latex":"x^2 - 4x + 3 = (x-1)(x-3) = 0","expr":"(x-1)*(x-3)=0"}
+{"t":"say","text":"Each bracket can be zero, so the roots are x = 1 and x = 3."}
+{"t":"solutions","id":"roots","of":"fac","var":"x","values":[1,3],"latex":"x = 1 \\quad \\text{or} \\quad x = 3"}
+{"t":"mark","kind":"underline","target":"roots","note":"where the curve meets the x-axis"}
+{"t":"say","text":"Here is the graph, with both roots marked on the x-axis."}
+{"t":"plot","id":"p1","x":[-1,5],"y":[-2,6],"fns":[{"id":"f1","expr":"x^2-4*x+3","label":"y = x² − 4x + 3"}]}
+{"t":"point","plot":"p1","id":"r1","at":[1,0],"label":"(1, 0)"}
+{"t":"point","plot":"p1","id":"r2","at":[3,0],"label":"(3, 0)"}
+{"t":"say","text":"A parabola is symmetric, so its axis of symmetry sits exactly halfway between the two roots."}
+{"t":"math","id":"axis","latex":"x = \\frac{1+3}{2} = 2","expr":"x=(1+3)/2"}
+{"t":"say","text":"The vertex lies on that axis, so its x-coordinate is 2. Substitute to find y."}
+{"t":"math","id":"sub","latex":"y = 2^2 - 4(2) + 3 = 4 - 8 + 3 = -1","expr":"2^2-4*2+3"}
+{"t":"point","plot":"p1","id":"v","at":[2,-1],"label":"Vertex (2, −1)"}
+{"t":"mark","kind":"circle","target":"v","note":"lowest point, on the axis x = 2"}
+{"t":"say","text":"So the vertex is (2, −1). Quick check: which statement explains why the vertex has x = 2?"}
+{"t":"check","id":"c1","kind":"choice","prompt":"Why is the x-coordinate of the vertex equal to 2?","options":[{"id":"a","text":"It is halfway between the roots 1 and 3, because the parabola is symmetric.","correct":true,"misconception":""},{"id":"b","text":"It is the constant term 3 minus 1.","correct":false,"misconception":"Believes the vertex x-value comes from combining the constant term with a root, rather than from symmetry."},{"id":"c","text":"It is the x-value where the curve crosses the y-axis.","correct":false,"misconception":"Confuses the y-intercept (x = 0, y = 3) with the vertex."},{"id":"d","text":"It is half of the coefficient −4, so x = −2.","correct":false,"misconception":"Halves the coefficient of x but forgets the sign change, so uses −b/2 incorrectly as b/2."}],"explain":"Right: a parabola is symmetric, so its vertex sits halfway between the two roots.","hint":"Think about the symmetry of the curve and where the two roots sit."}
