@@ -96,6 +96,21 @@ describe('table', () => {
   })
 })
 
+describe('table rigor', () => {
+  const tb = (fn: string, rows: string[][]): Action => ({ t: 'table', id: 't', head: ['x', 'y'], rows, fn })
+  test('vacuous or partially skipped tables are unchecked', () => {
+    expect(verifyAction(tb('a*x', [['1', '2']]), empty).status).toBe('unchecked')
+    expect(verifyAction(tb('x^2', [['1', '?']]), empty).status).toBe('unchecked')
+    expect(verifyAction(tb('x^2', [['1', '1'], ['2', '?']]), empty).status).toBe('unchecked')
+    expect(verifyAction(tb('x^2', [['1', '1'], ['2']]), empty).status).toBe('unchecked')
+    expect(verifyAction(tb('x^2', [['1', '2'], ['2', '?']]), empty).status).toBe('fail')
+  })
+  test('tolerance follows displayed precision', () => {
+    expect(verifyAction(tb('1/x', [['3', '0.33']]), empty).status).toBe('pass')
+    expect(verifyAction(tb('1/x', [['3', '0.34']]), empty).status).toBe('fail')
+  })
+})
+
 describe('check', () => {
   const base = { t: 'check' as const, id: 'c', prompt: 'p', explain: 'e', hint: 'h' }
   test('choice: exactly one correct, distinct non-empty misconceptions', () => {

@@ -192,16 +192,20 @@ function verifyTable(a: Extract<Action, { t: 'table' }>): Verification {
   const p = parse(a.fn)
   if (!p || p.kind !== 'expr') return UNCHECKED
   const f = fnOf(p.node)
+  let checked = 0
+  let skipped = false
   for (const [i, row] of a.rows.entries()) {
-    if (row.length < 2) continue
+    if (row.length < 2) { skipped = true; continue }
     const x = constantValue(row[0] as string)
     const y = constantValue(row[1] as string)
-    if (Number.isNaN(x) || Number.isNaN(y)) continue
     const want = f(x)
-    if (Number.isNaN(want)) continue
-    if (!close(want, y, 1e-3)) return fail(`row ${i + 1}: at x = ${num(x)} the value should be ${num(want)} but the table says ${num(y)}`)
+    if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(want)) { skipped = true; continue }
+    checked++
+    const d = (/\.(\d+)\s*$/.exec((row[1] as string).trim())?.[1] ?? '').length
+    const ok = Number(want.toFixed(d)) === y || Math.abs(want - y) <= 0.5 * 10 ** -d + 1e-9
+    if (!ok) return fail(`row ${i + 1}: at x = ${num(x)} the value should be ${num(want)} but the table says ${num(y)}`)
   }
-  return PASS
+  return checked > 0 && !skipped ? PASS : UNCHECKED
 }
 
 type Check = Extract<Action, { t: 'check' }>
@@ -297,7 +301,7 @@ function verifyExplore(a: Extract<Action, { t: 'explore' }>): Verification {
   return PASS
 }
 
-export function verifyAction(a: Action, ctx: VerifyContext): Verification {
+function verifyUnsafe(a: Action, ctx: VerifyContext): Verification {
   switch (a.t) {
     case 'math': return verifyMath(a)
     case 'step': return verifyStep(a, ctx)
@@ -307,5 +311,13 @@ export function verifyAction(a: Action, ctx: VerifyContext): Verification {
     case 'check': return verifyCheck(a, ctx)
     case 'explore': return verifyExplore(a)
     default: return UNCHECKED
+  }
+}
+
+export function verifyAction(a: Action, ctx: VerifyContext): Verification {
+  try {
+    return verifyUnsafe(a, ctx)
+  } catch {
+    return UNCHECKED
   }
 }
