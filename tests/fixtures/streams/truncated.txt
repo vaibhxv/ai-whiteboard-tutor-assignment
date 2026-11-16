@@ -1,0 +1,4 @@
+{"t":"say","text":"Let's find where the curve y = x² − 4x + 3 crosses the x-axis, since that reveals the vertex."}
+{"t":"math","id":"eq1","latex":"y = x^2 - 4x + 3","expr":"y=x^2-4*x+3"}
+{"t":"say","text":"Set y to zero and factor: we need two numbers multiplying to 3 and adding to −4."}
+{"t":"say","text":"Cut off mid

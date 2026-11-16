@@ -1,0 +1,58 @@
+import type { Action } from '../actions'
+
+export type RefResult = { ok: true } | { ok: false; reason: string }
+
+const bad = (reason: string): RefResult => ({ ok: false, reason })
+
+function fnIds(a: Action | undefined): string[] {
+  return a && a.t === 'plot' ? a.fns.map((f) => f.id) : []
+}
+
+export function checkRefs(
+  a: Action,
+  index: ReadonlyMap<string, Action>,
+  local: ReadonlySet<string>,
+): RefResult {
+  if ('id' in a && typeof a.id === 'string' && (index.has(a.id) || local.has(a.id))) {
+    return bad(`duplicate id ${a.id}`)
+  }
+  const exists = (id: string) => index.has(id) || local.has(id)
+  const plotOf = (id: string): Action | undefined => {
+    const p = index.get(id)
+    return p && p.t === 'plot' ? p : undefined
+  }
+  switch (a.t) {
+    case 'mark':
+      if (!exists(a.target)) return bad(`unknown target ${a.target}`)
+      break
+    case 'point': {
+      const p = plotOf(a.plot)
+      if (!p) return bad(`unknown plot ${a.plot}`)
+      if (a.on !== undefined && !fnIds(p).includes(a.on)) return bad(`unknown fn ${a.on} on plot ${a.plot}`)
+      break
+    }
+    case 'line':
+    case 'guide':
+      if (!plotOf(a.plot)) return bad(`unknown plot ${a.plot}`)
+      break
+    case 'step':
+      if (a.from !== undefined && !exists(a.from)) return bad(`unknown from ${a.from}`)
+      break
+    case 'solutions':
+      if (!exists(a.of)) return bad(`unknown of ${a.of}`)
+      break
+    case 'check':
+      if (a.kind === 'tap') {
+        const fig = index.get(a.figure)
+        if (!fig) return bad(`unknown figure ${a.figure}`)
+        if (!exists(a.answer) && !fnIds(fig).includes(a.answer)) return bad(`unknown answer ${a.answer}`)
+      } else if (a.kind === 'set') {
+        const e = index.get(a.explore)
+        if (!e || e.t !== 'explore') return bad(`unknown explore ${a.explore}`)
+      }
+      break
+    default:
+      break
+  }
+  return { ok: true }
+}
