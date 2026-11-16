@@ -25,8 +25,8 @@ export type CheckpointProps = {
   onContinue(): void
 }
 
-const FIRST_WRONG = "Not quite. Let's look at it another way."
-const SECOND_WRONG = "Let's work through it together."
+export const FIRST_WRONG = "Not quite. Let's look at it another way."
+export const SECOND_WRONG = "Let's work through it together."
 
 export function Checkpoint(p: CheckpointProps) {
   const { check, record } = p
