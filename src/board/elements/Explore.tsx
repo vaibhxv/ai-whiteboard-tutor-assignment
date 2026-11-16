@@ -6,6 +6,7 @@ import type { Box, Placed } from '../../layout/types'
 import { fmtNum } from '../../maths/format'
 import { PlotDrawing, plotFns, PlotKids } from './Plot'
 import { plotGeometry } from '../plot/geometry'
+import type { Anim } from '../anim'
 import { HtmlRoot } from './shared'
 import type { ElProps } from './shared'
 
@@ -43,8 +44,9 @@ export function ExploreControls(p: ElProps & { values: ParamValues; onParam(name
 }
 
 /** SVG half: the live curve for the current params, plus points on it. Decorative (the HTML half is the labelled root). */
-export function ExploreFigure({ item, values, kids, labels, index, selectedId, onSelect }: {
+export function ExploreFigure({ item, values, kids, labels, index, selectedId, onSelect, anim, animOf }: {
   item: Placed; labels: ReadonlyMap<string, Box>; values: ParamValues; kids: Placed[]; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
+  anim?: Anim; animOf?: (item: Placed) => Anim | undefined
 }) {
   const a = item.action as Exp
   const fns = useMemo(() => plotFns(a, values), [a, values])
@@ -52,10 +54,10 @@ export function ExploreFigure({ item, values, kids, labels, index, selectedId, o
   const geo = useMemo(() => plotGeometry(area, a.x, a.y, fns), [area.x, area.y, area.w, area.h, a, fns]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
-      <g className={`explore-figure ink-${item.ink}`} aria-hidden="true">
+      <g className={`explore-figure ink-${item.ink}${anim ? ` ${anim.cls}` : ''}`} style={anim?.style} aria-hidden="true">
         <PlotDrawing id={item.id} box={area} x={a.x} y={a.y} fns={fns} geo={geo} />
       </g>
-      <PlotKids plot={item} kids={kids} area={area} labels={labels} index={index} selectedId={selectedId} onSelect={onSelect} />
+      <PlotKids plot={item} kids={kids} area={area} labels={labels} index={index} selectedId={selectedId} onSelect={onSelect} animOf={animOf} />
     </>
   )
 }

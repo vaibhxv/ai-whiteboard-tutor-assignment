@@ -1,5 +1,6 @@
 import type { Action } from '../actions'
 import type { Box, Placed } from '../layout/types'
+import type { Anim } from './anim'
 import { describeAction } from './describe'
 import { ExploreControls, ExploreFigure } from './elements/Explore'
 import type { ParamValues } from './elements/Explore'
@@ -22,6 +23,8 @@ export type ViewCtx = {
   index: ReadonlyMap<string, Action>
   selected?: string
   onSelect(id: string): void
+  /** Draw-on animation of an item (undefined for static ones); `layer` picks the explore half. */
+  animOf(item: Placed, layer?: 'html' | 'svg'): Anim | undefined
   noteOf(markId: string): Box
   kidsOf(plotId: string): Placed[]
   /** Laid-out label boxes of points, lines and guides, by element id. */
@@ -31,7 +34,7 @@ export type ViewCtx = {
 }
 
 export function HtmlElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
-  const p = { item, index: ctx.index, selected: ctx.selected === item.id, onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index) }
+  const p = { item, index: ctx.index, selected: ctx.selected === item.id, onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index), anim: ctx.animOf(item, 'html') }
   switch (item.action.t) {
     case 'write': return <Write {...p} />
     case 'math':
@@ -45,13 +48,13 @@ export function HtmlElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
 }
 
 export function SvgElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
-  const p = { item, index: ctx.index, selected: ctx.selected === item.id, onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index) }
+  const p = { item, index: ctx.index, selected: ctx.selected === item.id, onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index), anim: ctx.animOf(item, 'svg') }
   switch (item.action.t) {
-    case 'plot': return <Plot {...p} kids={ctx.kidsOf(item.id)} labels={ctx.labels} selectedId={ctx.selected} />
+    case 'plot': return <Plot {...p} kids={ctx.kidsOf(item.id)} labels={ctx.labels} selectedId={ctx.selected} animOf={ctx.animOf} />
     case 'numberline': return <NumberLine {...p} />
     case 'mark': return <Mark {...p} note={ctx.noteOf(item.id)} />
     case 'explore':
-      return <ExploreFigure item={item} values={ctx.params(item.id)} kids={ctx.kidsOf(item.id)} labels={ctx.labels} index={ctx.index} selectedId={ctx.selected} onSelect={ctx.onSelect} />
+      return <ExploreFigure item={item} values={ctx.params(item.id)} kids={ctx.kidsOf(item.id)} labels={ctx.labels} index={ctx.index} selectedId={ctx.selected} onSelect={ctx.onSelect} anim={p.anim} animOf={ctx.animOf} />
     default: return null
   }
 }

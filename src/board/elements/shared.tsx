@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { renderLatex } from './shared-latex'
+import type { Anim } from '../anim'
 import type { Action } from '../../actions'
 import type { Checked } from '../../maths/verify'
 import type { Placed } from '../../layout/types'
@@ -11,6 +12,19 @@ export type ElProps = {
   selected: boolean
   onSelect(id: string): void
   label: string
+  /** Draw-on animation of this element, when its beat is the one being spoken. */
+  anim?: Anim
+}
+
+/** Enter or Space on the element itself (not on a control inside it) selects it. */
+export function selectKeys(id: string, onSelect: (id: string) => void) {
+  return (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(id)
+    }
+  }
 }
 
 export function Latex({ latex, className }: { latex: string; className?: string }) {
@@ -48,8 +62,8 @@ export function useDescId(): string {
 
 /** Absolutely positioned HTML element root: handles box, focus, selection and the fit scale. */
 export function HtmlRoot({
-  item, selected, onSelect, label, className, role = 'img', children,
-}: ElProps & { className: string; role?: 'img' | 'group'; children: ReactNode }) {
+  item, selected, onSelect, label, className, anim, role = 'button', children,
+}: ElProps & { className: string; role?: 'button' | 'group'; children: ReactNode }) {
   const { box, fit } = item
   const descId = useDescId()
   const a = item.action
@@ -61,14 +75,17 @@ export function HtmlRoot({
   return (
     <div
       data-el={item.id}
-      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}${item.reprise ? ' is-reprise' : ''}`}
-      style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+      data-ox={box.x}
+      data-oy={box.y}
+      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}${item.reprise ? ' is-reprise' : ''}${anim ? ` ${anim.cls}` : ''}`}
+      style={{ left: box.x, top: box.y, width: box.w, height: box.h, ...anim?.style }}
       tabIndex={0}
       role={role}
+      aria-pressed={role === 'button' ? selected : undefined}
       aria-label={labelWith(a, label)}
       aria-describedby={failEvidence ? descId : undefined}
       onClick={() => onSelect(item.id)}
-      onKeyDown={(e) => { if (e.key === 'Enter') onSelect(item.id) }}
+      onKeyDown={selectKeys(item.id, onSelect)}
     >
       {body}
       <VerifyBadge a={a} descId={descId} />
@@ -79,18 +96,22 @@ export function HtmlRoot({
 
 /** SVG element root with a focus ring rect (outline on <g> is unreliable). */
 export function SvgRoot({
-  item, selected, onSelect, label, className, children,
-}: ElProps & { className: string; children: ReactNode }) {
+  item, selected, onSelect, label, className, anim, selectable = true, children,
+}: ElProps & { className: string; selectable?: boolean; children: ReactNode }) {
   const { box } = item
   return (
     <g
       data-el={item.id}
-      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}`}
+      data-ox={box.x}
+      data-oy={box.y}
+      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}${anim ? ` ${anim.cls}` : ''}`}
+      style={anim?.style}
       tabIndex={0}
-      role="img"
+      role={selectable ? 'button' : 'img'}
+      aria-pressed={selectable ? selected : undefined}
       aria-label={labelWith(item.action, label)}
-      onClick={() => onSelect(item.id)}
-      onKeyDown={(e) => { if (e.key === 'Enter') onSelect(item.id) }}
+      onClick={selectable ? () => onSelect(item.id) : undefined}
+      onKeyDown={selectable ? selectKeys(item.id, onSelect) : undefined}
     >
       <rect className="focus-ring" x={box.x - 2} y={box.y - 2} width={box.w + 4} height={box.h + 4} rx={4} />
       {children}

@@ -61,4 +61,32 @@ svg text.svg-note { stroke: var(--board-bg); stroke-width: 4px; paint-order: str
 .mark-note { font-family: 'Playpen Sans', 'Comic Sans MS', cursive; font-size: 18px; line-height: 1.25; color: var(--accent); }
 .ink-answer .mark-note { color: var(--ink-answer); }
 
-@media (prefers-reduced-motion: reduce) { .board * { transition: none !important; animation: none !important; } }
+/* Draw-on animation. --delay and --d are set inline per element; `backwards` holds the start state during the delay and leaves
+   the element untouched afterwards (so a wipe never clips a badge or focus ring once finished). */
+@keyframes wipe { from { clip-path: inset(-6px 100% -6px 0); } to { clip-path: inset(-6px -40px -6px 0); } }
+@keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.anim-wipe { animation: wipe var(--d, 600ms) linear var(--delay, 0ms) backwards; }
+.anim-fade { animation: fade var(--d, 150ms) ease-out var(--delay, 0ms) backwards; }
+.anim-stroke path.stroke[pathLength], .anim-plot .axes path.stroke, .anim-plot path.curve {
+  stroke-dasharray: 1; stroke-dashoffset: 0;
+}
+.anim-stroke path.stroke { animation: draw var(--d, 600ms) ease-in-out var(--delay, 0ms) backwards; }
+.anim-stroke text, .anim-stroke circle, .anim-stroke foreignObject { animation: fade calc(var(--d, 600ms) * .3) ease-out calc(var(--delay, 0ms) + var(--d, 600ms) * .7) backwards; }
+/* A plot: axes first (40% of the duration), then the curves left to right (60%), labels once the axes are down. */
+.anim-plot .axes path.stroke { animation: draw calc(var(--d, 600ms) * .4) ease-in-out var(--delay, 0ms) backwards; }
+.anim-plot path.curve { animation: draw calc(var(--d, 600ms) * .6) ease-in-out calc(var(--delay, 0ms) + var(--d, 600ms) * .4) backwards; }
+.anim-plot text { animation: fade calc(var(--d, 600ms) * .3) ease-out calc(var(--delay, 0ms) + var(--d, 600ms) * .4) backwards; }
+.paused, .paused * { animation-play-state: paused !important; }
+/* Reduced motion: whatever the element would have done, it fades in over 150 ms instead. */
+@media (prefers-reduced-motion: reduce) {
+  .board * { transition: none !important; }
+  .board [class*="anim-"], .board [class*="anim-"] * { animation: fade 150ms ease-out var(--delay, 0ms) backwards !important; stroke-dasharray: none !important; }
+  .board .anim-plot text, .board .anim-stroke text, .board .anim-stroke circle { animation: none !important; }
+}
+
+/* Selection popover, in board units; font and padding shrink-proof against the board scale. */
+.popover { position: absolute; z-index: 5; display: flex; flex-direction: column; gap: calc(6px / var(--board-scale, 1)); padding: calc(8px / var(--board-scale, 1)); background: var(--board-bg); border: calc(2px / var(--board-scale, 1)) solid var(--accent); border-radius: calc(10px / var(--board-scale, 1)); box-shadow: 0 calc(4px / var(--board-scale, 1)) calc(14px / var(--board-scale, 1)) #0003; }
+.popover button { font: 600 calc(15px / var(--board-scale, 1))/1.2 system-ui, sans-serif; min-height: calc(40px / var(--board-scale, 1)); padding: 0 calc(10px / var(--board-scale, 1)); color: var(--ink); background: transparent; border: calc(1.5px / var(--board-scale, 1)) solid currentColor; border-radius: calc(8px / var(--board-scale, 1)); cursor: pointer; text-align: left; }
+.popover button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.popover button:focus-visible { outline: calc(3px / var(--board-scale, 1)) solid var(--focus); outline-offset: calc(2px / var(--board-scale, 1)); }

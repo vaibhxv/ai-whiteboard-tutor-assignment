@@ -12,6 +12,7 @@ import { axisPos, labelSize, placeAround, plotGeometry } from '../plot/geometry'
 import type { PlotFn, PlotGeo } from '../plot/geometry'
 import { niceTicks } from '../plot/ticks'
 import { roughPaths, seedOf } from '../rough'
+import type { Anim } from '../anim'
 import { SvgRoot } from './shared'
 import type { ElProps } from './shared'
 
@@ -37,13 +38,13 @@ function Axes({ id, area, x, y }: { id: string; area: Box; x: [number, number]; 
     roughPaths('line', { x1, y1, x2, y2 }, seedOf(`${id}:${s}`))
   return (
     <g className="axes">
-      {rp('ax', inner.x, ay, inner.x + inner.w, ay).map((d, i) => <path key={`x${i}`} d={d} className="stroke" />)}
-      {rp('ay', ax, inner.y, ax, inner.y + inner.h).map((d, i) => <path key={`y${i}`} d={d} className="stroke" />)}
+      {rp('ax', inner.x, ay, inner.x + inner.w, ay).map((d, i) => <path key={`x${i}`} d={d} className="stroke" pathLength={1} />)}
+      {rp('ay', ax, inner.y, ax, inner.y + inner.h).map((d, i) => <path key={`y${i}`} d={d} className="stroke" pathLength={1} />)}
       {xt.map((t) => {
         const px = toPx([t, 0])[0]
         return (
           <g key={`tx${t}`}>
-            {rp(`tx${t}`, px, ay - 5, px, ay + 5).map((d, i) => <path key={i} d={d} className="stroke" />)}
+            {rp(`tx${t}`, px, ay - 5, px, ay + 5).map((d, i) => <path key={i} d={d} className="stroke" pathLength={1} />)}
             {!(crossAtOrigin && t === 0) && (
               <text x={px} y={Math.min(ay + 22, inner.y + inner.h + 22)} textAnchor="middle" className="tick-label">{fmtNum(t)}</text>
             )}
@@ -54,7 +55,7 @@ function Axes({ id, area, x, y }: { id: string; area: Box; x: [number, number]; 
         const py = toPx([0, t])[1]
         return (
           <g key={`ty${t}`}>
-            {rp(`ty${t}`, ax - 5, py, ax + 5, py).map((d, i) => <path key={i} d={d} className="stroke" />)}
+            {rp(`ty${t}`, ax - 5, py, ax + 5, py).map((d, i) => <path key={i} d={d} className="stroke" pathLength={1} />)}
             {!(crossAtOrigin && t === 0) && (
               <text x={Math.max(ax - 10, inner.x - 10)} y={py + 5} textAnchor="end" className="tick-label">{fmtNum(t)}</text>
             )}
@@ -130,7 +131,7 @@ function KidShape({ kid, area, plot, label }: { kid: Placed; area: Box; plot: { 
     return (
       <>
         {roughPaths('line', { x1, y1, x2, y2 }, seedOf(kid.id)).map((d, i) => (
-          <path key={i} d={d} className="stroke" strokeDasharray={c.dashed ? '8 6' : undefined} />
+          <path key={i} d={d} className="stroke" pathLength={c.dashed ? undefined : 1} strokeDasharray={c.dashed ? '8 6' : undefined} />
         ))}
         {text}
       </>
@@ -164,7 +165,7 @@ export function PlotDrawing({ id, box, x, y, fns, geo }: { id: string; box: Box;
       <Axes id={id} area={box} x={x} y={y} />
       <clipPath id={clip}><rect x={inner.x} y={inner.y} width={inner.w} height={inner.h} /></clipPath>
       <g clipPath={`url(#${clip})`}>
-        {paths.map((d, i) => d && <path key={fns[i]?.id ?? i} d={d} className={`curve fn-${i % 4}`} fill="none" />)}
+        {paths.map((d, i) => d && <path key={fns[i]?.id ?? i} d={d} className={`curve fn-${i % 4}`} fill="none" pathLength={1} />)}
       </g>
       {geo.legend.map(({ fn, box: b }) => (
         <text key={fn.id} x={b.x} y={b.y + b.h - 5} className={`legend fn-${fns.indexOf(fn) % 4}`}>{fn.label}</text>
@@ -174,15 +175,17 @@ export function PlotDrawing({ id, box, x, y, fns, geo }: { id: string; box: Box;
 }
 
 /** Points, lines and guides on a plot: each is its own focusable element, laid out against the others. */
-export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect }: {
+export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect, animOf }: {
   plot: Placed; kids: Placed[]; area: Box; labels: ReadonlyMap<string, Box>; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
+  animOf?: (item: Placed) => Anim | undefined
 }) {
   const a = plot.action as Extract<Action, { t: 'plot' | 'explore' }>
   return (
     <>
       {kids.map((k) => (
         <SvgRoot
-          key={k.id}
+          key={`${k.id}:${animOf?.(k)?.key ?? ''}`}
+          anim={animOf?.(k)}
           index={index}
           onSelect={onSelect}
           item={{ ...k, box: markTargetBox(k, plot) }}
@@ -198,8 +201,8 @@ export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect
   )
 }
 
-export function Plot(p: ElProps & { kids: Placed[]; labels: ReadonlyMap<string, Box>; selectedId?: string }) {
-  const { kids, labels, selectedId, ...root } = p
+export function Plot(p: ElProps & { kids: Placed[]; labels: ReadonlyMap<string, Box>; selectedId?: string; animOf?: (item: Placed) => Anim | undefined }) {
+  const { kids, labels, selectedId, animOf, ...root } = p
   const a = p.item.action as Extract<Action, { t: 'plot' }>
   const fns = useMemo<PlotFn[]>(() => a.fns.map((f) => ({ id: f.id, f: compileFn(f.expr), label: f.label })), [a])
   const area = plotArea(a, p.item.box)
@@ -209,7 +212,7 @@ export function Plot(p: ElProps & { kids: Placed[]; labels: ReadonlyMap<string, 
       <SvgRoot {...root} className="el-plot">
         <PlotDrawing id={p.item.id} box={area} x={a.x} y={a.y} fns={fns} geo={geo} />
       </SvgRoot>
-      <PlotKids plot={p.item} kids={kids} area={area} labels={labels} index={p.index} selectedId={selectedId} onSelect={p.onSelect} />
+      <PlotKids plot={p.item} kids={kids} area={area} labels={labels} index={p.index} selectedId={selectedId} onSelect={p.onSelect} animOf={animOf} />
     </>
   )
 }

@@ -21,8 +21,8 @@ export function Mark({ note, ...p }: ElProps & { note: Box }) {
       break
   }
   return (
-    <SvgRoot {...p} className="el-mark">
-      {paths.map((d, i) => <path key={i} d={d} className="stroke mark-stroke" />)}
+    <SvgRoot {...p} selectable={false} className="el-mark">
+      {paths.map((d, i) => <path key={i} d={d} className="stroke mark-stroke" pathLength={1} />)}
       {a.note && (
         <foreignObject x={note.x} y={note.y} width={note.w} height={note.h}>
           <div className="mark-note">{a.note}</div>
