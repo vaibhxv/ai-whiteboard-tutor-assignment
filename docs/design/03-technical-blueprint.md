@@ -536,7 +536,7 @@ There is **no growing chat transcript**. Each call is stateless and carries a su
 |---|---|---|
 | plan | Topic submitted | 800 |
 | segment | Start of lesson; then one ahead | 1,800 |
-| reteach | First wrong answer; "I'm lost" | 900 |
+| reteach | First wrong answer | 900 |
 | solution | Learner asks to see the worked solution | 900 |
 | lost | "I'm lost" | 900 |
 | answer | A question | 700 |

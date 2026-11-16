@@ -1,9 +1,6 @@
 {
   "name": "whyboard",
   "version": "0.1.0",
-  "directories": {
-    "doc": "docs"
-  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,15 +11,7 @@
     "record": "tsx scripts/record.ts",
     "evaluate": "tsx scripts/evaluate.ts"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vaibhxv/ai-whiteboard-tutor-assignment.git"
-  },
   "type": "module",
-  "bugs": {
-    "url": "https://github.com/vaibhxv/ai-whiteboard-tutor-assignment/issues"
-  },
-  "homepage": "https://github.com/vaibhxv/ai-whiteboard-tutor-assignment#readme",
   "dependencies": {
     "@fontsource/playpen-sans": "5.3.0",
     "@vitejs/plugin-react": "6.3.0",
