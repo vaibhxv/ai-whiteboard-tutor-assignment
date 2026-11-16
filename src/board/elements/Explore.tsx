@@ -32,6 +32,15 @@ export function ExploreControls(p: ElProps & { values: ParamValues; onParam(name
               <input
                 type="range" min={q.min} max={q.max} step={(q.max - q.min) / 200} value={v}
                 aria-labelledby={`${uid}-${q.name}`}
+                aria-valuetext={`${q.name} = ${fmtNum(v)}`}
+                onKeyDown={(e) => {
+                  const step = (q.max - q.min) / 200
+                  const dir = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0
+                  if (dir === 0) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onParam(q.name, Math.min(q.max, Math.max(q.min, v + dir * step)))
+                }}
                 onChange={(e) => onParam(q.name, Number(e.target.value))}
                 onClick={(e) => e.stopPropagation()}
               />

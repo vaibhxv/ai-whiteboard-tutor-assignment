@@ -26,6 +26,9 @@ export type BoardProps = {
   paused?: boolean
   speed: number
   selected?: string
+  /** Controlled explore slider values by explore id; when given, `onParamChange` reports edits instead of Board keeping them. */
+  params?: Record<string, ParamValues>
+  onParamChange?(id: string, name: string, v: number): void
   onSelect(id: string | undefined): void
   onAskAbout?(id: string): void
   onReport?(id: string): void
@@ -68,7 +71,8 @@ export function Board(props: BoardProps) {
   const outer = useRef<HTMLDivElement>(null)
   const width = useWidth(outer)
   const s = width > 0 ? width / lw : 1
-  const [edits, setEdits] = useState<Record<string, ParamValues>>({})
+  const [localEdits, setEdits] = useState<Record<string, ParamValues>>({})
+  const edits = props.params ?? localEdits
   const page = pages[pageIndex]
 
   const shown = useMemo<Placed[]>(() => {
@@ -110,7 +114,10 @@ export function Board(props: BoardProps) {
     labels,
     kidsOf: (id) => shown.filter((i) => isInplot(i) && i.parent === id),
     params,
-    setParam: (id, name, v) => setEdits((e) => ({ ...e, [id]: { ...e[id], [name]: v } })),
+    setParam: (id, name, v) => {
+      if (props.params) props.onParamChange?.(id, name, v)
+      else setEdits((e) => ({ ...e, [id]: { ...e[id], [name]: v } }))
+    },
   }
   const html = shown.filter(inHtmlLayer)
   const svg = shown.filter(inSvgLayer)
