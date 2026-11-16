@@ -1,4 +1,5 @@
 import type { Action } from '../actions'
+import type { Checked } from '../maths/verify'
 
 export type Viewport = 'wide' | 'narrow'
 export type Template = 'notes' | 'split'
@@ -12,13 +13,19 @@ export interface Measurer {
 
 export type Placed = {
   id: string
-  action: Action
+  /** The beat's action as accepted by the pipeline, including its `verify` result. */
+  action: Checked
   box: Box
   beatId: string
   ink: 'lesson' | 'answer'
   region: Region
   parent?: string
   reprise?: boolean
+  /**
+   * Set (0.25 ≤ fit < 1) only when a beat too tall for an empty page was shrunk to fit:
+   * the box is the measured size × fit, so the Board renders the content with a CSS scale(fit).
+   */
+  fit?: number
 }
 
 export type Page = {

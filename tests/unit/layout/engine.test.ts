@@ -188,7 +188,35 @@ describe('paginate', () => {
     const tall = { measure: () => ({ w: 500, h: 400 }) }
     const pages = paginate([{ segKey: 's', template: 'notes', beats }], tall, 'wide')
     expect(pages).toHaveLength(1)
-    for (const it of allItems(pages)) expect(inside(it.box, { x: 40, y: 40, w: 1120, h: 670 })).toBe(true)
+    for (const it of allItems(pages)) {
+      expect(inside(it.box, { x: 40, y: 40, w: 1120, h: 670 })).toBe(true)
+      // content is scaled to its box, preserving aspect: box = measured size × fit
+      expect(it.fit).toBeDefined()
+      expect(it.fit as number).toBeGreaterThanOrEqual(0.25)
+      expect(it.fit as number).toBeLessThan(1)
+      expect(it.box.h).toBeCloseTo(400 * (it.fit as number))
+      expect(it.box.w).toBeCloseTo(500 * (it.fit as number))
+    }
     expect(noOverlap(allItems(pages))).toBe(true)
+  })
+
+  test('fit never drops below 0.25; normal beats carry no fit', () => {
+    const huge = { measure: () => ({ w: 500, h: 5000 }) }
+    const pages = paginate([{ segKey: 's', template: 'notes', beats: [beat('s#0', [w('a')])] }], huge, 'wide')
+    expect(find(pages[0], 'a')?.fit).toBe(0.25)
+    const normal = paginate([{ segKey: 'seg:1', template: 'split', beats: spikeBeats() }], fake, 'wide')
+    for (const it of allItems(normal)) expect('fit' in it).toBe(false)
+  })
+
+  test('a point or mark that precedes its plot in the same beat is dropped, without throwing', () => {
+    const beats = [beat('s#0', [pt('early', 'p1', [1, 1]), mark('p1'), plot('p1')])]
+    const pages = paginate([{ segKey: 's', template: 'split', beats }], fake, 'wide')
+    expect(pages[0]?.dropped).toEqual(['early', 's#0~m1'])
+    expect(pages[0]?.items.map((i) => i.id)).toEqual(['p1'])
+  })
+
+  test('placed actions keep their verification', () => {
+    const [p] = paginate([{ segKey: 'seg:1', template: 'split', beats: spikeBeats() }], fake, 'wide')
+    expect(find(p, 'eq1')?.action.verify).toEqual({ status: 'unchecked' })
   })
 })

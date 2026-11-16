@@ -1,4 +1,5 @@
 import type { Action, PlanRecord } from '../actions'
+import type { Checked } from '../maths/verify'
 import type { Beat } from '../pipeline/beats'
 import { boardBox, EXPLORE_PARAM_H, GAP, geometry } from './constants'
 import type { Geometry } from './constants'
@@ -8,7 +9,7 @@ import type { Box, Measurer, Page, Placed, Template, Viewport } from './types'
 type Representation = Extract<PlanRecord, { t: 'segment' }>['representation']
 type Ink = Placed['ink']
 /** What placement needs from a beat; reprises reuse it with the figure and its inplot children. */
-type BeatLike = { id: string; ink: Ink; actions: readonly Action[] }
+type BeatLike = { id: string; ink: Ink; actions: readonly Checked[] }
 
 export function templateFor(representation: Representation): Template {
   return representation === 'graph' || representation === 'table' || representation === 'numberline' ? 'split' : 'notes'
@@ -24,7 +25,13 @@ const UNPLACED = new Set<Action['t']>(['say', 'page', 'check', 'ask'])
 
 type Build = { page: Page; geo: Geometry; cursor: number; figureTaken: boolean }
 type Trial = { ok: boolean; items: Placed[]; dropped: string[]; cursor: number; figureTaken: boolean }
-type Slot = { a: Action; i: number; kind: 'flow' | 'figure' | 'inplot' | 'mark'; x: number; w: number; h: number }
+type Slot = {
+  a: Checked; i: number; kind: 'flow' | 'figure' | 'inplot' | 'mark'; x: number; w: number; h: number
+  /** A figure in the flow: re-centred in the column if shrunk. */
+  centred?: boolean
+}
+/** A forced beat never shrinks below a quarter of its measured size. */
+const MIN_FIT = 0.25
 
 function newBuild(index: number, segKey: string, template: Template, vp: Viewport): Build {
   const geo = geometry(template, vp)
@@ -32,7 +39,7 @@ function newBuild(index: number, segKey: string, template: Template, vp: Viewpor
 }
 
 /** Decides where each action goes and its natural size; null when the beat needs a second figure region. */
-function plan(b: Build, actions: readonly Action[], m: Measurer, force: boolean): Slot[] | null {
+function plan(b: Build, actions: readonly Checked[], m: Measurer, force: boolean): Slot[] | null {
   const { geo } = b
   const slots: Slot[] = []
   let taken = b.figureTaken
@@ -55,7 +62,7 @@ function plan(b: Build, actions: readonly Action[], m: Measurer, force: boolean)
       const h = a.t === 'plot' ? geo.flowPlotH
         : a.t === 'explore' ? geo.flowPlotH + EXPLORE_PARAM_H * a.params.length
         : m.measure(a, flowFigW).h
-      slots.push({ a, i, kind: 'flow', x: flowFigX, w: flowFigW, h })
+      slots.push({ a, i, kind: 'flow', x: flowFigX, w: flowFigW, h, centred: true })
       continue
     }
     const size = m.measure(a, geo.colW)
@@ -66,7 +73,9 @@ function plan(b: Build, actions: readonly Action[], m: Measurer, force: boolean)
 
 /**
  * Tries to place a whole beat on the page without mutating it. With `force` (an otherwise empty
- * page) it always succeeds: a second plot goes into the flow and flow heights shrink to fit.
+ * page) it always succeeds: a second plot goes into the flow, and flow items shrink by one factor
+ * `fit` (width and height, ≥ MIN_FIT) recorded on each item so the Board scales the content to its
+ * box. At MIN_FIT a pathological beat may still run past the page bottom.
  */
 function placeBeat(b: Build, beat: BeatLike, m: Measurer, vp: Viewport, force: boolean): Trial {
   const fail: Trial = { ok: false, items: [], dropped: [], cursor: b.cursor, figureTaken: b.figureTaken }
@@ -78,7 +87,7 @@ function placeBeat(b: Build, beat: BeatLike, m: Measurer, vp: Viewport, force: b
   let scale = 1
   if (flow.length > 0 && need > room) {
     if (!force) return fail
-    scale = Math.max(0, room) / need
+    scale = Math.max(MIN_FIT, Math.max(0, room) / need)
   }
 
   const items: Placed[] = []
@@ -87,8 +96,8 @@ function placeBeat(b: Build, beat: BeatLike, m: Measurer, vp: Viewport, force: b
   const find = (id: string): Placed | undefined =>
     items.find((p) => p.id === id && p.region !== 'overlay') ??
     b.page.items.find((p) => p.id === id && p.region !== 'overlay')
-  const put = (a: Action, id: string, box: Box, region: Placed['region'], parent?: string) =>
-    items.push({ id, action: a, box, beatId: beat.id, ink: beat.ink, region, ...(parent === undefined ? {} : { parent }) })
+  const put = (a: Checked, id: string, box: Box, region: Placed['region'], extra: Partial<Placed> = {}) =>
+    items.push({ id, action: a, box, beatId: beat.id, ink: beat.ink, region, ...extra })
 
   let cursor = b.cursor
   let figureTaken = b.figureTaken
@@ -98,12 +107,18 @@ function placeBeat(b: Build, beat: BeatLike, m: Measurer, vp: Viewport, force: b
       figureTaken = true
       put(a, a.id, { x: s.x, y: b.geo.figure.y, w: s.w, h: s.h }, 'figure')
     } else if (s.kind === 'flow' && 'id' in a) {
+      const w = s.w * scale
       const h = s.h * scale
-      put(a, a.id, { x: s.x, y: cursor, w: s.w, h }, 'notes')
+      const x = s.centred ? b.geo.colX + (b.geo.colW - w) / 2 : s.x
+      put(a, a.id, { x, y: cursor, w, h }, 'notes', scale < 1 ? { fit: scale } : {})
       cursor += h + GAP
-    } else if ((a.t === 'point' || a.t === 'line' || a.t === 'guide')) {
+    } else if (a.t === 'point' || a.t === 'line' || a.t === 'guide') {
+      // Refs resolve only to items placed before this one (earlier beats, or earlier in this beat).
+      // The pipeline's checkRefs only accepts a reference to an already-accepted id, so a point,
+      // line, guide or mark before its plot/target in the same beat cannot arrive from a valid
+      // stream; if it ever does, it is dropped (recorded in page.dropped), never thrown.
       const parent = find(a.plot)
-      if (parent && isPlotLike(parent.action)) put(a, a.id, parent.box, 'inplot', a.plot)
+      if (parent && isPlotLike(parent.action)) put(a, a.id, parent.box, 'inplot', { parent: a.plot })
       else dropped.push(a.id)
     } else if (a.t === 'mark') {
       const id = markId(beat.id, s.i)
