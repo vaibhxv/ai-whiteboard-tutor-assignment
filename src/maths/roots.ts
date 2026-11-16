@@ -53,7 +53,7 @@ export function findRealRoots(f: (x: number) => number, lo = -50, hi = 50): numb
     if (i === 0 || Number.isNaN(y)) continue
     const p = at(i - 1)
     if (Number.isNaN(p) || p === 0) continue
-    if (p * y < 0) {
+    if (Math.sign(p) !== Math.sign(y)) {
       if (Math.abs(p) > POLE || Math.abs(y) > POLE) continue
       let a = xs[i - 1] as number
       let b = xs[i] as number
@@ -88,7 +88,7 @@ export function findRealRoots(f: (x: number) => number, lo = -50, hi = 50): numb
     const y = at(i)
     const n = at(i + 1)
     if (Number.isNaN(p) || Number.isNaN(y) || Number.isNaN(n) || y === 0) continue
-    if (p * n <= 0) continue
+    if (Math.sign(p) !== Math.sign(n)) continue
     if (Math.abs(y) <= Math.abs(p) && Math.abs(y) <= Math.abs(n)) {
       const x = golden(absf, xs[i - 1] as number, xs[i + 1] as number)
       if (absf(x) < 1e-9) roots.push(x)

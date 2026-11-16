@@ -55,7 +55,7 @@ function fixImplicitCalls(node: MathNode): MathNode {
       const f = n as unknown as { fn: MathNode; args: MathNode[] }
       const name = f.fn.type === 'SymbolNode' ? (f.fn as unknown as { name: string }).name : ''
       if (isVarName(name) && !'fgh'.includes(name) && f.args.length === 1 && f.args[0]) {
-        return new OperatorNode('*', 'multiply', [new SymbolNode(name), f.args[0]], true)
+        return new OperatorNode('*', 'multiply', [new SymbolNode(name), fixImplicitCalls(f.args[0])], true)
       }
     }
     return n

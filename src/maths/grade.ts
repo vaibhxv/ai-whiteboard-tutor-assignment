@@ -1,5 +1,5 @@
 import type { Expr } from '../actions'
-import { equationsEquivalent as _unused, exprEquivalent } from './equivalence'
+import { exprEquivalent } from './equivalence'
 import { compile, normalizeInput, parseMath } from './safe'
 
 export type Grade = { result: 'correct' | 'wrong' } | { result: 'invalid'; message: string }

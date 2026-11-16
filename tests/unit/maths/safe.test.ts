@@ -25,6 +25,20 @@ describe('parseMath', () => {
     expect(parseMath('x+'.repeat(100) + '1').ok).toBe(false)
     expect(parseMath('x+1+'.repeat(40) + '1').ok).toBe(true)
   })
+  test('rejects over 200 nodes within the char cap', () => {
+    const s = '2x+'.repeat(65) + '2x'
+    expect(s.length).toBeLessThanOrEqual(200)
+    expect(parseMath(s).ok).toBe(false)
+  })
+  test('nested implicit calls', () => {
+    const run = (s: string, x: number) => {
+      const r = parseMath(s)
+      if (!r.ok || r.value.kind !== 'expr') throw new Error(s)
+      return compile(r.value.node)({ x })
+    }
+    expect(run('x(x(x+1))', 2)).toBe(12)
+    expect(run('x(2x(x+1))', 2)).toBe(24)
+  })
   test('accepts a dense expression just under the node cap', () => {
     expect(parseMath(Array.from({ length: 100 }, () => '1').join('+')).ok).toBe(true)
   })
