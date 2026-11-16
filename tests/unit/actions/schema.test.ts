@@ -48,6 +48,12 @@ describe('parseLine', () => {
     expect(parseLine(choice({ hint: 'x'.repeat(161) }), 'board').ok).toBe(false)
   })
 
+  test('check failures name the offending field', () => {
+    const base = { t: 'check', id: 'c', prompt: 'p', explain: 'e' }
+    expect(reason(JSON.stringify({ ...base, kind: 'number', answer: '2' }), 'board')).toMatch(/hint/)
+    expect(reason(JSON.stringify({ ...base, hint: 'h', kind: 'essay' }), 'board')).toMatch(/kind/)
+  })
+
   test('other check kinds parse', () => {
     const base = { t: 'check', id: 'c', prompt: 'p', explain: 'e', hint: 'h' }
     expect(parseLine(JSON.stringify({ ...base, kind: 'number', answer: '2' }), 'board').ok).toBe(true)

@@ -113,12 +113,9 @@ const Check = z.discriminatedUnion('kind', [
   }),
 ])
 
-export const ActionSchema = z.union([
-  z.discriminatedUnion('t', [
-    Say, Page, Write, Math_, Step, Solutions, Plot, Point, Line, Guide, NumberLine, Table,
-    Mark, Explore, Ask,
-  ]),
-  Check,
+export const ActionSchema = z.discriminatedUnion('t', [
+  Say, Page, Write, Math_, Step, Solutions, Plot, Point, Line, Guide, NumberLine, Table,
+  Mark, Explore, Check, Ask,
 ])
 
 export type Action = z.infer<typeof ActionSchema>
