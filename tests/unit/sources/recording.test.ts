@@ -60,4 +60,23 @@ describe('recording', () => {
       }
     }
   })
+
+  test('all ids are unique across every fixture response', () => {
+    const rec = RecordingSchema.parse(raw)
+    const seen = new Map<string, string>()
+    const dupes: string[] = []
+    const add = (id: string, k: string) => {
+      if (seen.has(id)) dupes.push(`${id} (${seen.get(id)} and ${k})`)
+      else seen.set(id, k)
+    }
+    for (const [k, r] of Object.entries(rec.responses)) {
+      for (const line of r.text.split('\n').filter(Boolean)) {
+        const o = JSON.parse(line) as { t: string; id?: string; fns?: { id: string }[] }
+        if (o.t === 'segment' || o.t === 'scope' || o.t === 'objective') continue
+        if (typeof o.id === 'string') add(o.id, k)
+        for (const f of o.fns ?? []) add(f.id, k)
+      }
+    }
+    expect(dupes).toEqual([])
+  })
 })

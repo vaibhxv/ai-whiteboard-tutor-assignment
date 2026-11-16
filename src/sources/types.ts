@@ -50,12 +50,13 @@ export async function* throwOnErrorEvents(it: AsyncIterable<GenEvent>): AsyncGen
   }
 }
 
-const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
+/** `d Mon yyyy` from UTC date parts and a fixed month table, so output never depends on ICU data. */
 function formatDate(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
-  return dateFmt.format(d).replace('Sept', 'Sep')
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
 /** Exact on-screen badge text. Live badges carry their text; recorded ones are built from model and date. */
