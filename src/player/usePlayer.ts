@@ -121,9 +121,14 @@ export function usePlayer(store: StoreApi<LessonStore>, opts: PlayerOpts): Playe
 
   // Advance contract: the reducer does not self-advance.
   const stalled = state ? stalledAtEnd(state) : false
+  const stallKey = stalled && state ? `${state.cursor.seg}:${state.cursor.beat}` : null
+  const stallDone = useRef<string | null>(null)
   useEffect(() => {
-    if (stalled) store.getState().dispatch({ type: 'player/advance' })
-  }, [stalled, store])
+    if (stallKey === null) { stallDone.current = null; return }
+    if (stallDone.current === stallKey) return // once per stall (StrictMode / remount safe)
+    stallDone.current = stallKey
+    store.getState().dispatch({ type: 'player/advance' })
+  }, [stallKey, store])
 
   const setPausedBoth = (v: boolean) => { pausedRef.current = v; setPaused(v) }
 
@@ -172,8 +177,8 @@ export function usePlayer(store: StoreApi<LessonStore>, opts: PlayerOpts): Playe
   }, [speech])
 
   const raiseHand = useCallback(() => {
-    scheduler.pause()
-    setPausedBoth(true)
+    // Raising a hand is not a user pause: stop speech now; the open overlay stops the lesson track.
+    scheduler.stop()
     store.getState().dispatch({ type: 'interrupt/open' })
   }, [scheduler, store])
 
@@ -206,9 +211,10 @@ export function usePlayer(store: StoreApi<LessonStore>, opts: PlayerOpts): Playe
   }, [state, pages])
 
   const animating = useMemo(
-    () => (play ? { beatId: play.beat.id, timing: timeBeat(play.beat, speed) } : undefined),
+    // Speed changes apply from the next beat: the timing is frozen to what the scheduler started with.
+    () => (play ? { beatId: play.beat.id, timing: timeBeat(play.beat, speedRef.current) } : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [play?.key, speed],
+    [play?.key, playToken],
   )
 
   const waiting = useMemo(() => {

@@ -12,7 +12,7 @@ const OWN_KEYS = 'input, textarea, select, button, [role="button"], [contentedit
 /** Binds the player keys on `target`; returns the unbind function. */
 export function bindKeys(target: Window, h: KeyHandlers): () => void {
   const onKey = (e: KeyboardEvent) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
     const t = e.target
     if (t instanceof Element && t.closest(OWN_KEYS)) return
     let fn: (() => void) | undefined

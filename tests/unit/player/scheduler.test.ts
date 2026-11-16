@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import { createSpeech } from '../../../src/player/speech'
 import { createScheduler } from '../../../src/player/scheduler'
 import { estimateSpeechMs, timeBeat } from '../../../src/player/durations'
 import { beat, w } from '../layout/fake'
@@ -126,5 +127,32 @@ describe('scheduler', () => {
     expect(ended).toEqual(['s#1'])
     expect(sch.state).toBe('idle')
     expect(vi.isFakeTimers()).toBe(false)
+  })
+})
+
+describe('scheduler with the real speech', () => {
+  class U { text: string; rate = 1; voice: unknown = null; lang = ''; onend: (() => void) | null = null; onerror: (() => void) | null = null; constructor(t: string) { this.text = t } }
+  const beats = [beat('s#0', [w('a')], 'one two three'), beat('s#1', [w('b')], ''), beat('s#2', [w('c')], 'four five')]
+
+  async function run(synth: unknown) {
+    vi.stubGlobal('SpeechSynthesisUtterance', U)
+    const clock = fakeClock()
+    const speech = createSpeech({ muted: () => false, synth: synth as never, clock })
+    const ended: string[] = []
+    let i = 0
+    const sch = createScheduler({ speech, clock, onBeatEnd: (id) => { ended.push(id); if (++i < beats.length) sch.play(beats[i]!, 1) } })
+    sch.play(beats[0]!, 1)
+    for (let k = 0; k < 40; k++) { clock.tick(500); await flush() }
+    clock.tick(100_000); await flush()
+    vi.unstubAllGlobals()
+    return ended
+  }
+
+  test('synth null: every beat ends exactly once, in order', async () => {
+    expect(await run(null)).toEqual(['s#0', 's#1', 's#2'])
+  })
+  test('synth that never fires end: watchdog ends each beat once', async () => {
+    const synth = { speak: vi.fn(), cancel: vi.fn(), getVoices: () => [{ name: 'v', lang: 'en-US', localService: true }] }
+    expect(await run(synth)).toEqual(['s#0', 's#1', 's#2'])
   })
 })

@@ -183,10 +183,10 @@ describe('usePlayer', () => {
     expect(hook.result.current.waiting).toBe(false)
   })
 
-  test('/ raises the hand and pauses', () => {
+  test('/ raises the hand: stops speech, opens overlay, not a user pause', () => {
     const { store, speech, hook } = setupPlayer()
     act(() => hook.result.current.raiseHand())
-    expect(hook.result.current.paused).toBe(true)
+    expect(hook.result.current.paused).toBe(false)
     expect(speech.spoken[0]!.cancelled).toBe(true)
     expect(store.getState().state!.overlay).not.toBeNull()
   })
@@ -201,3 +201,46 @@ describe('usePlayer', () => {
 function beat0() {
   return beat('seg:1#0', [w('z0')], 'beat 0')
 }
+
+describe('usePlayer fix round 1', () => {
+  test('raise hand: speech cancelled synchronously, answer beats auto-play and advance, close replays lesson beat', async () => {
+    const { store, clock, speech, hook } = setupPlayer()
+    act(() => hook.result.current.raiseHand())
+    expect(speech.spoken[0]!.cancelled).toBe(true)
+    expect(hook.result.current.paused).toBe(false)
+    const d = (e: LessonEvent) => act(() => store.getState().dispatch(e))
+    d({ type: 'interrupt/ask', threadId: 't1', question: 'why?', targets: [] })
+    d({ type: 'thread/stream', threadId: 't1' })
+    d({ type: 'thread/beat', threadId: 't1', beat: beat('t1#0', [w('q0')], 'answer one') })
+    d({ type: 'thread/beat', threadId: 't1', beat: beat('t1#1', [w('q1')], 'answer two') })
+    expect(hook.result.current.track).toBe('answer')
+    expect(speech.spoken.at(-1)!.text).toBe('answer one')
+    await act(async () => { speech.spoken.at(-1)!.finish(); clock.tick(10_000); await flush() })
+    const pb = store.getState().state!.playback
+    expect(pb.track === 'answer' && pb.beat).toBe(1)
+    expect(speech.spoken.at(-1)!.text).toBe('answer two')
+    d({ type: 'interrupt/close', outcome: 'clear' })
+    expect(hook.result.current.track).toBe('lesson')
+    expect(speech.spoken.at(-1)!.text).toBe('beat 0')
+    expect(store.getState().state!.cursor.beat).toBe(0)
+  })
+
+  test('speed change mid-beat applies from the next beat; animating timing frozen', async () => {
+    const { store, clock, speech, hook } = setupPlayer()
+    const t0 = hook.result.current.animating!.timing
+    act(() => hook.result.current.setSpeed(1.5))
+    expect(hook.result.current.animating!.timing).toEqual(t0)
+    await act(async () => { speech.spoken[0]!.finish(); clock.tick(10_000); await flush() })
+    expect(store.getState().state!.cursor.beat).toBe(1)
+    expect(speech.spoken[1]!.rate).toBe(1.5)
+    const b = store.getState().state!.segments['seg:1']!.beats[1]!
+    expect(hook.result.current.animating!.timing).toEqual(timeBeat(b, 1.5))
+  })
+
+  test('stalled end dispatches advance once per stall', () => {
+    const { store, hook } = setupPlayer([{ type: 'seg/stream', key: 'seg:1' }, { type: 'seg/beat', key: 'seg:1', beat: beat0() }])
+    const spy = vi.spyOn(store.getState(), 'dispatch')
+    hook.rerender()
+    expect(spy).not.toHaveBeenCalled()
+  })
+})
