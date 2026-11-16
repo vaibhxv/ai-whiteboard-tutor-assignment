@@ -13,8 +13,18 @@ export function checkRefs(
   index: ReadonlyMap<string, Action>,
   local: ReadonlySet<string>,
 ): RefResult {
-  if ('id' in a && typeof a.id === 'string' && (index.has(a.id) || local.has(a.id))) {
-    return bad(`duplicate id ${a.id}`)
+  const taken = (id: string): boolean => {
+    if (index.has(id) || local.has(id)) return true
+    for (const v of index.values()) if (fnIds(v).includes(id)) return true
+    return false
+  }
+  if ('id' in a && typeof a.id === 'string' && taken(a.id)) return bad(`duplicate id ${a.id}`)
+  if (a.t === 'plot') {
+    const seen = new Set<string>([a.id])
+    for (const f of a.fns) {
+      if (seen.has(f.id) || taken(f.id)) return bad(`duplicate id ${f.id}`)
+      seen.add(f.id)
+    }
   }
   const exists = (id: string) => index.has(id) || local.has(id)
   const plotOf = (id: string): Action | undefined => {
@@ -45,7 +55,11 @@ export function checkRefs(
       if (a.kind === 'tap') {
         const fig = index.get(a.figure)
         if (!fig) return bad(`unknown figure ${a.figure}`)
-        if (!exists(a.answer) && !fnIds(fig).includes(a.answer)) return bad(`unknown answer ${a.answer}`)
+        if (fig.t !== 'plot' && fig.t !== 'explore') return bad(`tap figure ${a.figure} is not a plot`)
+        const ans = index.get(a.answer)
+        const onFigure = fnIds(fig).includes(a.answer) ||
+          (ans !== undefined && 'plot' in ans && ans.plot === a.figure)
+        if (!onFigure) return bad(`tap answer ${a.answer} is not on figure ${a.figure}`)
       } else if (a.kind === 'set') {
         const e = index.get(a.explore)
         if (!e || e.t !== 'explore') return bad(`unknown explore ${a.explore}`)

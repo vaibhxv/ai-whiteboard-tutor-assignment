@@ -60,6 +60,7 @@ export function createBoardPipeline(opts: BoardPipelineOpts): {
         opts.index.set(a.id, a)
         local.add(a.id)
       }
+      if (a.t === 'plot') for (const f of a.fns) local.add(f.id)
       if ((a.t === 'math' || a.t === 'step') && a.expr !== undefined) lastMathId = a.id
       accepted++
       if (verify.status === 'fail') failed.push(checked)

@@ -42,4 +42,27 @@ describe('checkRefs', () => {
     expect(checkRefs({ ...base, kind: 'set', explore: 'e1', param: 'a', target: [1, 2] }, idx(explore), none).ok).toBe(true)
     expect(checkRefs({ ...base, kind: 'set', explore: 'p1', param: 'a', target: [1, 2] }, idx(plot), none).ok).toBe(false)
   })
+  test('tap figure must be plot/explore; answer must be on figure', () => {
+    const base = { t: 'check', id: 'c', prompt: 'p', explain: 'e', hint: 'h', kind: 'tap' } as const
+    const plot2: Action = { t: 'plot', id: 'p2', x: [0, 1], y: [0, 1], fns: [{ id: 'g1', expr: 'x' }] }
+    const pt1: Action = { t: 'point', id: 'pt1', plot: 'p1', at: [0, 0] }
+    const pt2: Action = { t: 'point', id: 'pt2', plot: 'p2', at: [0, 0] }
+    const i = idx(plot, plot2, math, pt1, pt2)
+    expect(checkRefs({ ...base, figure: 'm1', answer: 'm1' }, i, none)).toEqual({ ok: false, reason: 'tap figure m1 is not a plot' })
+    expect(checkRefs({ ...base, figure: 'p1', answer: 'm1' }, i, none)).toEqual({ ok: false, reason: 'tap answer m1 is not on figure p1' })
+    expect(checkRefs({ ...base, figure: 'p1', answer: 'pt2' }, i, none).ok).toBe(false)
+    expect(checkRefs({ ...base, figure: 'p1', answer: 'g1' }, i, none).ok).toBe(false)
+    expect(checkRefs({ ...base, figure: 'p1', answer: 'pt1' }, i, none).ok).toBe(true)
+    expect(checkRefs({ ...base, figure: 'p1', answer: 'f1' }, i, none).ok).toBe(true)
+  })
+  test('plot fn ids join the duplicate-id check', () => {
+    const mk = (...ids: string[]): Action => ({ t: 'plot', id: 'pz', x: [0, 1], y: [0, 1], fns: ids.map((id) => ({ id, expr: 'x' })) })
+    expect(checkRefs(mk('m1'), idx(math), none)).toEqual({ ok: false, reason: 'duplicate id m1' })
+    expect(checkRefs(mk('a', 'a'), idx(), none).ok).toBe(false)
+    expect(checkRefs(mk('f1'), idx(plot), none).ok).toBe(false)
+    expect(checkRefs(mk('a'), idx(), new Set(['a'])).ok).toBe(false)
+    expect(checkRefs(mk('pz'), idx(), none).ok).toBe(false)
+    expect(checkRefs({ t: 'math', id: 'f1', latex: 'x' }, idx(plot), none).ok).toBe(false)
+    expect(checkRefs(mk('a', 'b'), idx(), none).ok).toBe(true)
+  })
 })
