@@ -25,6 +25,7 @@ export function CheckpointArea({ state, dispatch, selectedInFigure, paramValue, 
   const [held, setHeld] = useState<{ checkId: string; grade: CheckGrade }>()
   const [note, setNote] = useState<{ checkId: string; text: string }>()
   const box = useRef<HTMLDivElement>(null)
+  const noteEl = useRef<HTMLParagraphElement>(null)
   const kind = state.segments[state.cursor.seg]?.kind
 
   useEffect(() => {
@@ -37,9 +38,14 @@ export function CheckpointArea({ state, dispatch, selectedInFigure, paramValue, 
     if (typeof el?.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [check?.id, state.cursor.seg]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const el = noteEl.current
+    if (note && typeof el?.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [note])
+
   if (!check) {
     return note ? (
-      <p className="cp-note" role="status" data-result="wrong"><span aria-hidden="true">✗ </span>{note.text}</p>
+      <p ref={noteEl} className="cp-note" role="status" data-result="wrong"><span aria-hidden="true">✗ </span>{note.text}</p>
     ) : null
   }
 
@@ -79,6 +85,8 @@ export type SidePanelProps = {
   selectedInFigure?: string
   paramValue?: number
   onReplaySegment(): void
+  /** Narrow layout: the checkpoint is rendered in the stage under the captions instead. */
+  checkpointInStage?: boolean
   transcript: Beat[]
   index: ReadonlyMap<string, Action>
 }
@@ -92,7 +100,7 @@ export function SidePanel(p: SidePanelProps) {
       {state.objective ? (
         <p className="objective"><span className="objective-label">Goal: </span>{state.objective}</p>
       ) : null}
-      {inLesson ? (
+      {inLesson && !p.checkpointInStage ? (
         <CheckpointArea
           state={state} dispatch={dispatch} selectedInFigure={p.selectedInFigure} paramValue={p.paramValue} onReplaySegment={p.onReplaySegment}
         />

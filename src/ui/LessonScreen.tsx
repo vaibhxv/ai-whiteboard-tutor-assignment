@@ -21,7 +21,7 @@ import { Recap } from './Recap'
 import { ReviewView } from './ReviewView'
 import { boardMeasurer, leaveLesson, sessionDeps, useSession } from './session'
 import type { Session } from './session'
-import { SidePanel } from './SidePanel'
+import { CheckpointArea, SidePanel } from './SidePanel'
 import { useUi } from './store'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { WarmUp } from './WarmUp'
@@ -43,6 +43,29 @@ function useViewport(ref: RefObject<HTMLElement | null>): Viewport {
     return () => ro.disconnect()
   }, [ref])
   return vp
+}
+
+/** Room kept under the board on wide screens: captions (two lines), controls, disclosure and gaps. */
+const BELOW_BOARD = 200
+
+/**
+ * Side-by-side layout (≥ 1024 px): the board's rendered height is capped so the board, captions and
+ * controls fit in the window without scrolling. `relayout` changes when content above the board can move.
+ */
+function useBoardMaxHeight(ref: RefObject<HTMLElement | null>, relayout: string): number | undefined {
+  const [max, setMax] = useState<number>()
+  useLayoutEffect(() => {
+    const calc = () => {
+      const el = ref.current
+      if (!el || window.innerWidth < 1024) return setMax(undefined)
+      const top = el.getBoundingClientRect().top + window.scrollY
+      setMax(Math.max(240, Math.floor(window.innerHeight - top - BELOW_BOARD)))
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [ref, relayout])
+  return max
 }
 
 export function LessonScreen() {
@@ -69,6 +92,8 @@ function LessonView({ session }: { session: Session }) {
 
   const stageRef = useRef<HTMLDivElement>(null)
   const viewport = useViewport(stageRef)
+  const railKey = useStore(store, (s) => `${s.state?.order.length}:${s.state?.phase}:${s.state?.scope?.verdict}`)
+  const maxHeight = useBoardMaxHeight(stageRef, railKey)
   const measurer = useMemo(boardMeasurer, [])
   const player = usePlayer(store, {
     measureRoot: stageRef, viewport, measurer, initialSpeed: ui.speed, speech: sessionDeps().speech,
@@ -135,6 +160,8 @@ function LessonView({ session }: { session: Session }) {
   const recapBusy = phase === 'recap' && (state.recap?.status === 'pending' || state.recap?.status === 'streaming')
   const thinking = !state.overlay && (player.waiting || phase === 'planning' || recapBusy)
   const reviewing = review && state.segments[review] ? review : undefined
+  // Narrow (stacked) layout: the checkpoint goes right under the captions, not below the whole board column.
+  const cpInStage = viewport === 'narrow'
 
   let stage: React.ReactNode
   if (phase === 'planning') {
@@ -143,7 +170,7 @@ function LessonView({ session }: { session: Session }) {
     stage = (
       <ReviewView
         key={reviewing} title={segmentTitle(state, reviewing)} pages={player.pages.filter((p) => p.segKey === reviewing)}
-        index={index} viewport={viewport} onBack={closeReview}
+        index={index} viewport={viewport} maxHeight={maxHeight} onBack={closeReview}
       />
     )
   } else if (phase === 'warmup' && state.warmup) {
@@ -165,8 +192,12 @@ function LessonView({ session }: { session: Session }) {
           pages={player.pages} pageIndex={player.pageIndex} visibleBeats={player.visibleBeats} animating={player.animating}
           playToken={player.playToken} paused={player.paused} speed={player.speed} selected={selected} onSelect={ui.select}
           onAskAbout={onAskAbout} onReport={onReport} index={index} viewport={viewport} params={params} onParamChange={onParamChange}
+          maxHeight={maxHeight}
         />
         <Captions say={player.currentSay} enabled={captions} />
+        {cpInStage ? (
+          <CheckpointArea state={state} dispatch={dispatch} selectedInFigure={tapSel} paramValue={paramValue} onReplaySegment={replaySegment} />
+        ) : null}
         <div className="player-bar">
           <Controls
             paused={player.paused} muted={player.muted} speed={player.speed}
@@ -194,7 +225,7 @@ function LessonView({ session }: { session: Session }) {
         </div>
         <SidePanel
           state={state} dispatch={dispatch} selectedInFigure={tapSel} paramValue={paramValue}
-          onReplaySegment={replaySegment} transcript={player.transcriptBeats} index={index}
+          onReplaySegment={replaySegment} checkpointInStage={cpInStage} transcript={player.transcriptBeats} index={index}
         />
       </div>
       {problem ? (

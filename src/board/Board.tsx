@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import type { Action } from '../actions'
-import { BOARD } from '../layout/constants'
+import { BOARD, NARROW_MARGIN } from '../layout/constants'
 import { markTargetBox } from '../layout/marks'
 import type { Box, Page, Placed, Viewport } from '../layout/types'
 import type { BeatTiming } from '../player/durations'
@@ -35,6 +35,26 @@ export type BoardProps = {
   index: ReadonlyMap<string, Action>
   viewport: Viewport
   answer?: { panel: Box; items: Placed[]; visibleBeats: ReadonlySet<string> }
+  /** Cap on the rendered height in CSS px: the board scales down (keeping its aspect) to fit it. */
+  maxHeight?: number
+}
+
+/** A narrow board is rendered only as tall as the content drawn so far on its page, never below this. */
+export const NARROW_MIN_H = 360
+
+/**
+ * Logical height to render. Wide: the full board. Narrow: the bottom of what is on the page so far
+ * (items, notes, labels, answer panel) plus the margin, clamped to [NARROW_MIN_H, board height]. It only
+ * grows within a page (so a beat's draw-on never shrinks it) and starts over on a new page.
+ */
+function useRenderedHeight(viewport: Viewport, pageKey: string, bottoms: number[]): number {
+  const full = BOARD[viewport].h
+  const last = useRef<{ key: string; h: number }>({ key: '', h: 0 })
+  if (viewport !== 'narrow') return full
+  const used = Math.min(full, Math.max(NARROW_MIN_H, Math.ceil(Math.max(0, ...bottoms) + NARROW_MARGIN)))
+  const h = last.current.key === pageKey ? Math.max(last.current.h, used) : used
+  last.current = { key: pageKey, h }
+  return h
 }
 
 /** Width of the container, kept up to date; 0 when the environment has no layout (jsdom). */
@@ -69,8 +89,9 @@ export function Board(props: BoardProps) {
   const { pages, pageIndex, visibleBeats, selected, onSelect, index, viewport, answer, animating, playToken = 0, paused, onAskAbout, onReport } = props
   const { w: lw, h: lh } = BOARD[viewport]
   const outer = useRef<HTMLDivElement>(null)
-  const width = useWidth(outer)
-  const s = width > 0 ? width / lw : 1
+  // Measured on a full-width frame, so shrinking the board to `maxHeight` cannot feed back into its width.
+  const frame = useRef<HTMLDivElement>(null)
+  const width = useWidth(frame)
   const [localEdits, setEdits] = useState<Record<string, ParamValues>>({})
   const edits = props.params ?? localEdits
   const page = pages[pageIndex]
@@ -91,6 +112,17 @@ export function Board(props: BoardProps) {
   )
   const { notes, labels } = useMemo(() => layoutNotes(shown, lw, lh, params), [shown, lw, lh, params])
   const reduced = useMemo(prefersReducedMotion, [])
+
+  const bottoms = useMemo(() => {
+    const bs = shown.map((i) => i.box.y + i.box.h)
+    for (const b of [...notes.values(), ...labels.values()]) bs.push(b.y + b.h)
+    if (answer) bs.push(answer.panel.y + answer.panel.h)
+    return bs
+  }, [shown, notes, labels, answer])
+  const rh = useRenderedHeight(viewport, `${page?.segKey}:${page?.index}`, bottoms)
+  const fitW = width > 0 ? width / lw : 1
+  const s = props.maxHeight && props.maxHeight > 0 ? Math.min(fitW, props.maxHeight / rh) : fitW
+  const shrunk = s < fitW
 
   const animIndex = useMemo(() => {
     const m = new Map<string, number>()
@@ -158,25 +190,27 @@ export function Board(props: BoardProps) {
   }
 
   return (
-    <div
-      ref={outer}
-      className={`board-outer${paused ? ' paused' : ''}`}
-      style={{ height: lh * s }}
-      onKeyDown={onKeyDown}
-      onFocus={onFocus}
-      onPointerDown={() => { pointer.current = true; setTimeout(() => { pointer.current = false }, 0) }}
-    >
-      <div className={`board board-${viewport}`} style={{ width: lw, height: lh, transform: `scale(${s})`, ['--board-scale' as string]: s }}>
-        {answer && <div className="answer-panel" style={{ left: answer.panel.x, top: answer.panel.y, width: answer.panel.w, height: answer.panel.h }} />}
-        <div className="layer layer-html">
-          {html.map((it) => <HtmlElement key={keyOf(it)} item={it} ctx={ctx} />)}
+    <div className="board-frame" ref={frame}>
+      <div
+        ref={outer}
+        className={`board-outer${paused ? ' paused' : ''}`}
+        style={{ height: rh * s, ...(shrunk ? { width: lw * s, marginInline: 'auto' } : {}) }}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        onPointerDown={() => { pointer.current = true; setTimeout(() => { pointer.current = false }, 0) }}
+      >
+        <div className={`board board-${viewport}`} style={{ width: lw, height: lh, transform: `scale(${s})`, ['--board-scale' as string]: s }}>
+          {answer && <div className="answer-panel" style={{ left: answer.panel.x, top: answer.panel.y, width: answer.panel.w, height: answer.panel.h }} />}
+          <div className="layer layer-html">
+            {html.map((it) => <HtmlElement key={keyOf(it)} item={it} ctx={ctx} />)}
+          </div>
+          <svg className="layer layer-svg" viewBox={`0 0 ${lw} ${lh}`} width={lw} height={lh}>
+            {svg.map((it) => <SvgElement key={keyOf(it)} item={it} ctx={ctx} />)}
+          </svg>
+          {selected && anchor && (
+            <Popover id={selected} anchor={anchor} board={{ w: lw, h: rh }} scale={s} onAskAbout={onAskAbout} onReport={onReport} />
+          )}
         </div>
-        <svg className="layer layer-svg" viewBox={`0 0 ${lw} ${lh}`} width={lw} height={lh}>
-          {svg.map((it) => <SvgElement key={keyOf(it)} item={it} ctx={ctx} />)}
-        </svg>
-        {selected && anchor && (
-          <Popover id={selected} anchor={anchor} board={{ w: lw, h: lh }} scale={s} onAskAbout={onAskAbout} onReport={onReport} />
-        )}
       </div>
     </div>
   )

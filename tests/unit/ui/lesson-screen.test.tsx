@@ -88,12 +88,52 @@ describe('LessonScreen', () => {
   test('problem overlay: a missing recorded part explains itself and offers Go home', async () => {
     const { ['segment:1']: _gone, ...rest } = fixture.responses
     stubFetch({ '/recordings/vertex.json': { ...fixture, responses: rest } })
+    // Segment 1 is generated during the warm-up, so the problem opens over the warm-up.
     const { user } = await startVertex()
-    await user.click(screen.getByRole('button', { name: '2' }))
     await until(() => !!screen.queryByRole('alertdialog'), 5000, 50)
     const dlg = screen.getByRole('alertdialog')
     expect(within(dlg).getByText("That part isn't in this recorded lesson")).toBeInTheDocument()
+    // The rest of the app is inert while the problem is open, and focus starts on its primary action.
+    const app = document.querySelector('.app')!
+    expect(app.closest('[inert]')).not.toBeNull()
+    expect(dlg.closest('[inert]')).toBeNull()
+    expect(document.activeElement).toBe(within(dlg).getByRole('button', { name: 'Connect an AI' }))
+    await user.keyboard('{Escape}') // nothing destructive
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     await user.click(within(dlg).getByRole('button', { name: 'Go home' }))
     expect(useUi.getState().screen).toBe('home')
+    expect(document.querySelector('[inert]')).toBeNull()
+  })
+
+  test('narrow: the checkpoint and its wrong-answer note sit in the stage, right under the captions', async () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(375)
+    try {
+      const { user } = await startVertex()
+      await user.click(screen.getByRole('button', { name: 'Skip' }))
+      await until(() => lesson()?.phase === 'checkpoint')
+      const stage = document.querySelector('.stage')!
+      const side = screen.getByRole('complementary', { name: 'Lesson panel' })
+      const captions = screen.getByTestId('captions')
+      const cp = screen.getByRole('region', { name: 'Checkpoint' })
+      expect(stage.contains(cp)).toBe(true)
+      expect(side.contains(cp)).toBe(false)
+      expect(captions.compareDocumentPosition(cp) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      const controls = screen.getByRole('group', { name: 'Lesson controls' })
+      expect(cp.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      await user.click(screen.getByLabelText(/constant term 3 minus 1/i))
+      await user.click(screen.getByRole('button', { name: 'Check' }))
+      const note = screen.getByRole('status')
+      expect(stage.contains(note)).toBe(true)
+      expect(captions.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    } finally {
+      width.mockRestore()
+    }
+  })
+
+  test('wide: the checkpoint stays in the side panel', async () => {
+    const { user } = await startVertex()
+    await user.click(screen.getByRole('button', { name: 'Skip' }))
+    await until(() => lesson()?.phase === 'checkpoint')
+    expect(screen.getByRole('complementary', { name: 'Lesson panel' }).contains(screen.getByRole('region', { name: 'Checkpoint' }))).toBe(true)
   })
 })

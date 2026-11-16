@@ -6,8 +6,8 @@ import type { Page, Viewport } from '../layout/types'
 const noop = () => {}
 
 /** Read-only review of a completed segment: its pages, fully drawn, no animation (the lesson cursor stays put). */
-export function ReviewView({ title, pages, index, viewport, onBack }: {
-  title: string; pages: Page[]; index: ReadonlyMap<string, Action>; viewport: Viewport; onBack(): void
+export function ReviewView({ title, pages, index, viewport, maxHeight, onBack }: {
+  title: string; pages: Page[]; index: ReadonlyMap<string, Action>; viewport: Viewport; maxHeight?: number; onBack(): void
 }) {
   const [at, setAt] = useState(0)
   const i = Math.min(at, Math.max(0, pages.length - 1))
@@ -28,7 +28,7 @@ export function ReviewView({ title, pages, index, viewport, onBack }: {
         <button type="button" onClick={onBack}>Back to lesson</button>
       </div>
       {pages.length > 0 ? (
-        <Board pages={pages} pageIndex={i} visibleBeats={visible} speed={1} index={index} viewport={viewport} onSelect={noop} />
+        <Board pages={pages} pageIndex={i} visibleBeats={visible} speed={1} index={index} viewport={viewport} maxHeight={maxHeight} onSelect={noop} />
       ) : (
         <p className="helper">Nothing was drawn in this part.</p>
       )}
