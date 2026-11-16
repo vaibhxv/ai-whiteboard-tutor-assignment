@@ -5,7 +5,7 @@
     "via": "claude-code",
     "capturedAt": "2026-11-16",
     "actionsVersion": 1,
-    "selection": "hand-assembled test fixture from real model output; not a recording"
+    "selection": "hand-assembled test fixture, not a recording (plan and segment:1 are real model output; the rest is hand-written)"
   },
   "responses": {
     "plan": {
@@ -13,6 +13,43 @@
     },
     "segment:1": {
       "text": "{\"t\":\"say\",\"text\":\"Let's find where the curve y = x² − 4x + 3 crosses the x-axis, since that reveals the vertex.\"}\n{\"t\":\"math\",\"id\":\"eq1\",\"latex\":\"y = x^2 - 4x + 3\",\"expr\":\"y=x^2-4*x+3\"}\n{\"t\":\"say\",\"text\":\"Set y to zero and factor: we need two numbers multiplying to 3 and adding to −4.\"}\n{\"t\":\"math\",\"id\":\"fac\",\"latex\":\"x^2 - 4x + 3 = (x-1)(x-3) = 0\",\"expr\":\"(x-1)*(x-3)=0\"}\n{\"t\":\"say\",\"text\":\"Each bracket can be zero, so the roots are x = 1 and x = 3.\"}\n{\"t\":\"solutions\",\"id\":\"roots\",\"of\":\"fac\",\"var\":\"x\",\"values\":[1,3],\"latex\":\"x = 1 \\\\quad \\\\text{or} \\\\quad x = 3\"}\n{\"t\":\"mark\",\"kind\":\"underline\",\"target\":\"roots\",\"note\":\"where the curve meets the x-axis\"}\n{\"t\":\"say\",\"text\":\"Here is the graph, with both roots marked on the x-axis.\"}\n{\"t\":\"plot\",\"id\":\"p1\",\"x\":[-1,5],\"y\":[-2,6],\"fns\":[{\"id\":\"f1\",\"expr\":\"x^2-4*x+3\",\"label\":\"y = x² − 4x + 3\"}]}\n{\"t\":\"point\",\"plot\":\"p1\",\"id\":\"r1\",\"at\":[1,0],\"label\":\"(1, 0)\"}\n{\"t\":\"point\",\"plot\":\"p1\",\"id\":\"r2\",\"at\":[3,0],\"label\":\"(3, 0)\"}\n{\"t\":\"say\",\"text\":\"A parabola is symmetric, so its axis of symmetry sits exactly halfway between the two roots.\"}\n{\"t\":\"math\",\"id\":\"axis\",\"latex\":\"x = \\\\frac{1+3}{2} = 2\",\"expr\":\"x=(1+3)/2\"}\n{\"t\":\"say\",\"text\":\"The vertex lies on that axis, so its x-coordinate is 2. Substitute to find y.\"}\n{\"t\":\"math\",\"id\":\"sub\",\"latex\":\"y = 2^2 - 4(2) + 3 = 4 - 8 + 3 = -1\",\"expr\":\"2^2-4*2+3\"}\n{\"t\":\"point\",\"plot\":\"p1\",\"id\":\"v\",\"at\":[2,-1],\"label\":\"Vertex (2, −1)\"}\n{\"t\":\"mark\",\"kind\":\"circle\",\"target\":\"v\",\"note\":\"lowest point, on the axis x = 2\"}\n{\"t\":\"say\",\"text\":\"So the vertex is (2, −1). Quick check: which statement explains why the vertex has x = 2?\"}\n{\"t\":\"check\",\"id\":\"c1\",\"kind\":\"choice\",\"prompt\":\"Why is the x-coordinate of the vertex equal to 2?\",\"options\":[{\"id\":\"a\",\"text\":\"It is halfway between the roots 1 and 3, because the parabola is symmetric.\",\"correct\":true,\"misconception\":\"\"},{\"id\":\"b\",\"text\":\"It is the constant term 3 minus 1.\",\"correct\":false,\"misconception\":\"Believes the vertex x-value comes from combining the constant term with a root, rather than from symmetry.\"},{\"id\":\"c\",\"text\":\"It is the x-value where the curve crosses the y-axis.\",\"correct\":false,\"misconception\":\"Confuses the y-intercept (x = 0, y = 3) with the vertex.\"},{\"id\":\"d\",\"text\":\"It is half of the coefficient −4, so x = −2.\",\"correct\":false,\"misconception\":\"Halves the coefficient of x but forgets the sign change, so uses −b/2 incorrectly as b/2.\"}],\"explain\":\"Right: a parabola is symmetric, so its vertex sits halfway between the two roots.\",\"hint\":\"Think about the symmetry of the curve and where the two roots sit.\"}"
+    },
+    "segment:2": {
+      "text": "{\"t\":\"say\",\"text\":\"The vertex is the lowest point, so its y-value is the smallest value the curve reaches.\"}\n{\"t\":\"math\",\"id\":\"minv\",\"latex\":\"y_{\\\\min} = -1\"}\n{\"t\":\"say\",\"text\":\"Check another point: at x = 0 the height is 3, which is higher.\"}\n{\"t\":\"math\",\"id\":\"at0\",\"latex\":\"y = 0^2 - 4(0) + 3 = 3\",\"expr\":\"0^2-4*0+3\"}\n{\"t\":\"ask\",\"id\":\"q2\",\"text\":\"Why is the vertex the lowest point?\"}\n{\"t\":\"say\",\"text\":\"Quick check: what is the minimum value of y?\"}\n{\"t\":\"check\",\"id\":\"c2\",\"kind\":\"number\",\"prompt\":\"What is the minimum value of y on this parabola?\",\"answer\":\"-1\",\"tolerance\":0,\"anticipated\":[{\"value\":\"2\",\"misconception\":\"Gives the x-coordinate of the vertex instead of its y-value.\"}],\"explain\":\"Right: the vertex height is the minimum, so y = -1.\",\"hint\":\"Look at the height of the vertex, not its position along the x-axis.\"}"
+    },
+    "reteach:c1:b": {
+      "text": "{\"t\":\"say\",\"text\":\"Close, but 3 is where the curve crosses the y-axis, not where it is symmetric.\"}\n{\"t\":\"math\",\"id\":\"rb1\",\"latex\":\"x = \\\\frac{1+3}{2} = 2\",\"expr\":\"x=(1+3)/2\"}\n{\"t\":\"say\",\"text\":\"Halfway between the roots is 2, and symmetry puts the vertex on that line.\"}"
+    },
+    "reteach:c1:c": {
+      "text": "{\"t\":\"say\",\"text\":\"The y-axis crossing happens where x is 0, which gives a height of 3.\"}\n{\"t\":\"math\",\"id\":\"rc1\",\"latex\":\"y = 0^2 - 4(0) + 3 = 3\",\"expr\":\"0^2-4*0+3\"}\n{\"t\":\"say\",\"text\":\"That point is not the lowest one, so it cannot be the vertex.\"}\n{\"t\":\"say\",\"text\":\"The vertex sits halfway between the roots 1 and 3, so x = 2.\"}"
+    },
+    "reteach:c1:d": {
+      "text": "{\"t\":\"say\",\"text\":\"Halving the coefficient is close, but the sign flips: the axis is at negative b over two a.\"}\n{\"t\":\"math\",\"id\":\"rd1\",\"latex\":\"x = -\\\\frac{-4}{2(1)} = 2\",\"expr\":\"x=-(-4)/(2*1)\"}\n{\"t\":\"say\",\"text\":\"That agrees with the midpoint of the roots, so the vertex has x = 2.\"}"
+    },
+    "solution:c1": {
+      "text": "{\"t\":\"say\",\"text\":\"Here is the answer: the roots are 1 and 3, so the axis sits halfway between them.\"}\n{\"t\":\"math\",\"id\":\"sc1\",\"latex\":\"x = \\\\frac{1+3}{2} = 2\",\"expr\":\"x=(1+3)/2\"}\n{\"t\":\"say\",\"text\":\"The vertex lies on that axis, so its x-coordinate is 2.\"}"
+    },
+    "reteach:c2:a0": {
+      "text": "{\"t\":\"say\",\"text\":\"You found the x-coordinate 2. The question asks for the height at that point.\"}\n{\"t\":\"math\",\"id\":\"ra1\",\"latex\":\"y = 2^2 - 4(2) + 3 = -1\",\"expr\":\"2^2-4*2+3\"}\n{\"t\":\"say\",\"text\":\"Height means y, so the minimum value is negative one.\"}"
+    },
+    "reteach:c2:other": {
+      "text": "{\"t\":\"say\",\"text\":\"Try again: put x = 2 into the equation and read off the height.\"}\n{\"t\":\"math\",\"id\":\"ro1\",\"latex\":\"y = 4 - 8 + 3 = -1\",\"expr\":\"4-8+3\"}\n{\"t\":\"say\",\"text\":\"Every other point on the curve is higher than that.\"}"
+    },
+    "solution:c2": {
+      "text": "{\"t\":\"say\",\"text\":\"The lowest point is the vertex, and its height is the minimum value.\"}\n{\"t\":\"math\",\"id\":\"sc2\",\"latex\":\"y_{\\\\min} = 2^2 - 4(2) + 3 = -1\",\"expr\":\"2^2-4*2+3\"}\n{\"t\":\"say\",\"text\":\"So the minimum value of y is negative one.\"}"
+    },
+    "lost:1:1": {
+      "text": "{\"t\":\"say\",\"text\":\"Let me say it more simply: the curve is a mirror image on both sides of a line.\"}\n{\"t\":\"math\",\"id\":\"l11\",\"latex\":\"x = \\\\frac{1+3}{2} = 2\",\"expr\":\"x=(1+3)/2\"}\n{\"t\":\"say\",\"text\":\"That mirror line passes through the vertex, halfway between the roots.\"}"
+    },
+    "lost:2:1": {
+      "text": "{\"t\":\"say\",\"text\":\"Think of the vertex as the bottom of a bowl: nothing on the curve goes lower.\"}\n{\"t\":\"math\",\"id\":\"l21\",\"latex\":\"y = 2^2 - 4(2) + 3 = -1\",\"expr\":\"2^2-4*2+3\"}\n{\"t\":\"say\",\"text\":\"That height, negative one, is the smallest value of y.\"}"
+    },
+    "answer:q2": {
+      "question": "Why is the vertex the lowest point?",
+      "text": "{\"t\":\"say\",\"text\":\"The curve opens upward, so it falls to the vertex and then rises again.\"}\n{\"t\":\"math\",\"id\":\"aq1\",\"latex\":\"y = (x-2)^2 - 1\",\"expr\":\"y=(x-2)^2-1\"}\n{\"t\":\"say\",\"text\":\"A square is never negative, so y is smallest when the bracket is zero.\"}"
+    },
+    "recap": {
+      "text": "{\"t\":\"idea\",\"id\":\"i1\",\"text\":\"The vertex sits halfway between the roots, on the axis of symmetry.\",\"seg\":1}\n{\"t\":\"idea\",\"id\":\"i2\",\"text\":\"The height of the vertex is the minimum value of the parabola.\",\"seg\":2}\n{\"t\":\"say\",\"text\":\"Let us try a few on your own.\"}\n{\"t\":\"check\",\"id\":\"p1\",\"kind\":\"choice\",\"prompt\":\"A parabola has roots at 2 and 6. What is the x-coordinate of its vertex?\",\"options\":[{\"id\":\"a\",\"text\":\"4\",\"correct\":true},{\"id\":\"b\",\"text\":\"8\",\"correct\":false,\"misconception\":\"Adds the roots instead of halving the sum.\"},{\"id\":\"c\",\"text\":\"2\",\"correct\":false,\"misconception\":\"Uses a root instead of the midpoint.\"}],\"explain\":\"Halfway between 2 and 6 is 4.\",\"hint\":\"The axis is midway between the roots.\",\"idea\":\"i1\"}\n{\"t\":\"check\",\"id\":\"p2\",\"kind\":\"number\",\"prompt\":\"A parabola has roots at 0 and 8. What is the x-coordinate of its vertex?\",\"answer\":\"4\",\"tolerance\":0,\"explain\":\"Halfway between 0 and 8 is 4.\",\"hint\":\"Add the roots and halve.\",\"idea\":\"i1\"}\n{\"t\":\"check\",\"id\":\"p3\",\"kind\":\"number\",\"prompt\":\"y = x^2 - 4x + 3 has its vertex at (2, -1). What is its minimum value?\",\"answer\":\"-1\",\"tolerance\":0,\"anticipated\":[{\"value\":\"2\",\"misconception\":\"Gives the x-coordinate of the vertex instead of its y-value.\"}],\"explain\":\"The vertex height is the minimum, so -1.\",\"hint\":\"Which coordinate is the height?\",\"idea\":\"i2\"}"
     }
   }
 }
