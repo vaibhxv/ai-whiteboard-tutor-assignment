@@ -14,6 +14,8 @@ export type ElProps = {
   label: string
   /** Draw-on animation of this element, when its beat is the one being spoken. */
   anim?: Anim
+  /** The element was found wrong: drawn with a strike-through and a word, and stays visible (I4). */
+  struck?: boolean
 }
 
 /** Enter or Space on the element itself (not on a control inside it) selects it. */
@@ -62,7 +64,7 @@ export function useDescId(): string {
 
 /** Absolutely positioned HTML element root: handles box, focus, selection and the fit scale. */
 export function HtmlRoot({
-  item, selected, onSelect, label, className, anim, role = 'button', children,
+  item, selected, onSelect, label, className, anim, struck, role = 'button', children,
 }: ElProps & { className: string; role?: 'button' | 'group'; children: ReactNode }) {
   const { box, fit } = item
   const descId = useDescId()
@@ -77,18 +79,19 @@ export function HtmlRoot({
       data-el={item.id}
       data-ox={box.x}
       data-oy={box.y}
-      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}${item.reprise ? ' is-reprise' : ''}${anim ? ` ${anim.cls}` : ''}`}
+      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}${item.reprise ? ' is-reprise' : ''}${anim ? ` ${anim.cls}` : ''}${struck ? ' is-struck' : ''}`}
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, ...anim?.style }}
       tabIndex={0}
       role={role}
       aria-pressed={role === 'button' ? selected : undefined}
-      aria-label={labelWith(a, label)}
+      aria-label={struck ? `${labelWith(a, label)}. Marked as wrong.` : labelWith(a, label)}
       aria-describedby={failEvidence ? descId : undefined}
       onClick={() => onSelect(item.id)}
       onKeyDown={selectKeys(item.id, onSelect)}
     >
       {body}
       <VerifyBadge a={a} descId={descId} />
+      {struck && <><span className="strike-line" aria-hidden="true" /><span className="badge badge-struck">✗ wrong</span></>}
       {failEvidence && <span id={descId} className="sr-only">{failEvidence}</span>}
     </div>
   )
@@ -96,7 +99,7 @@ export function HtmlRoot({
 
 /** SVG element root with a focus ring rect (outline on <g> is unreliable). */
 export function SvgRoot({
-  item, selected, onSelect, label, className, anim, selectable = true, children,
+  item, selected, onSelect, label, className, anim, struck, selectable = true, children,
 }: ElProps & { className: string; selectable?: boolean; children: ReactNode }) {
   const { box } = item
   return (
@@ -115,6 +118,7 @@ export function SvgRoot({
     >
       <rect className="focus-ring" x={box.x - 2} y={box.y - 2} width={box.w + 4} height={box.h + 4} rx={4} />
       {children}
+      {struck && <line className="strike-svg" x1={box.x} y1={box.y + box.h / 2} x2={box.x + box.w} y2={box.y + box.h / 2} />}
     </g>
   )
 }

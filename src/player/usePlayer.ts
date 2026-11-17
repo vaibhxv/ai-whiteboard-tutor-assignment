@@ -120,7 +120,8 @@ export function usePlayer(store: StoreApi<LessonStore>, opts: PlayerOpts): Playe
   useEffect(() => () => scheduler.stop(), [scheduler])
 
   // Advance contract: the reducer does not self-advance.
-  const stalled = state ? stalledAtEnd(state) : false
+  // Never while an overlay is open: the cursor must stay where the learner interrupted.
+  const stalled = state && !state.overlay ? stalledAtEnd(state) : false
   const stallKey = stalled && state ? `${state.cursor.seg}:${state.cursor.beat}` : null
   const stallDone = useRef<string | null>(null)
   useEffect(() => {
@@ -177,6 +178,8 @@ export function usePlayer(store: StoreApi<LessonStore>, opts: PlayerOpts): Playe
   }, [speech])
 
   const raiseHand = useCallback(() => {
+    const open = store.getState().state?.overlay
+    if (open?.kind === 'interrupt' || (open?.kind === 'problem' && open.prev)) return // already up: do not cut the answer short
     // Raising a hand is not a user pause: stop speech now; the open overlay stops the lesson track.
     scheduler.stop()
     store.getState().dispatch({ type: 'interrupt/open' })

@@ -10,15 +10,22 @@ export type ControlsProps = {
   onReplay(): void
   onSpeed(s: number): void
   onToggleMute(): void
+  /** A raised hand stops the lesson track: Play and the step buttons are disabled until it is lowered. */
+  interrupted?: boolean
 }
 
 export function Controls(p: ControlsProps) {
   return (
     <div className="player-controls" role="group" aria-label="Lesson controls">
-      <button type="button" onClick={p.onBack}>Back one step</button>
-      <button type="button" onClick={p.onTogglePlay}>{p.paused ? 'Play' : 'Pause'}</button>
-      <button type="button" onClick={p.onForward}>Forward one step</button>
-      <button type="button" onClick={p.onReplay}>Replay this step</button>
+      <button type="button" onClick={p.onBack} disabled={p.interrupted}>Back one step</button>
+      <button
+        type="button" onClick={p.onTogglePlay} disabled={p.interrupted}
+        title={p.interrupted ? 'Paused while your hand is up' : undefined}
+      >
+        {p.interrupted || p.paused ? 'Play' : 'Pause'}
+      </button>
+      <button type="button" onClick={p.onForward} disabled={p.interrupted}>Forward one step</button>
+      <button type="button" onClick={p.onReplay} disabled={p.interrupted}>Replay this step</button>
       <select aria-label="Speed" value={String(p.speed)} onChange={(e) => p.onSpeed(Number(e.target.value))}>
         {SPEEDS.map((s) => <option key={s} value={String(s)}>{`${s}×`}</option>)}
       </select>

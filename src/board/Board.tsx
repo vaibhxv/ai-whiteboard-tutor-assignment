@@ -34,6 +34,8 @@ export type BoardProps = {
   onReport?(id: string): void
   index: ReadonlyMap<string, Action>
   viewport: Viewport
+  /** Ids of elements found wrong: drawn struck through, still visible. */
+  struck?: ReadonlySet<string>
   answer?: { panel: Box; items: Placed[]; visibleBeats: ReadonlySet<string> }
   /** Cap on the rendered height in CSS px: the board scales down (keeping its aspect) to fit it. */
   maxHeight?: number
@@ -41,6 +43,7 @@ export type BoardProps = {
 
 /** A narrow board is rendered only as tall as the content drawn so far on its page, never below this. */
 export const NARROW_MIN_H = 360
+const NO_STRUCK: ReadonlySet<string> = new Set()
 
 /**
  * Logical height to render. Wide: the full board. Narrow: the bottom of what is on the page so far
@@ -141,7 +144,7 @@ export function Board(props: BoardProps) {
   const keyOf = (it: Placed) => (animIndex.has(it.id) ? `${it.id}:${playToken}` : it.id)
 
   const ctx: ViewCtx = {
-    index, selected, onSelect, animOf,
+    index, selected, onSelect, animOf, struck: props.struck ?? NO_STRUCK,
     noteOf: (id) => notes.get(id) ?? { x: 0, y: 0, w: 160, h: 50 },
     labels,
     kidsOf: (id) => shown.filter((i) => isInplot(i) && i.parent === id),
@@ -151,7 +154,15 @@ export function Board(props: BoardProps) {
       else setEdits((e) => ({ ...e, [id]: { ...e[id], [name]: v } }))
     },
   }
-  const html = shown.filter(inHtmlLayer)
+  // Answer lines live in the panel, above the lesson; marks and points of an answer stay on the lesson's own layers.
+  const panelIds = useMemo(() => new Set((answer?.items ?? []).filter((i) => i.region === 'notes').map((i) => i.id)), [answer])
+  const html = shown.filter((i) => inHtmlLayer(i) && !panelIds.has(i.id))
+  const panelHtml = shown.filter((i) => inHtmlLayer(i) && panelIds.has(i.id))
+  const scroller = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (el && typeof el.scrollTo === 'function') el.scrollTo({ top: el.scrollHeight })
+  }, [panelHtml.length])
   const svg = shown.filter(inSvgLayer)
 
   const selItem = selected ? shown.find((i) => i.id === selected) : undefined
@@ -200,13 +211,27 @@ export function Board(props: BoardProps) {
         onPointerDown={() => { pointer.current = true; setTimeout(() => { pointer.current = false }, 0) }}
       >
         <div className={`board board-${viewport}`} style={{ width: lw, height: lh, transform: `scale(${s})`, ['--board-scale' as string]: s }}>
-          {answer && <div className="answer-panel" style={{ left: answer.panel.x, top: answer.panel.y, width: answer.panel.w, height: answer.panel.h }} />}
           <div className="layer layer-html">
             {html.map((it) => <HtmlElement key={keyOf(it)} item={it} ctx={ctx} />)}
           </div>
           <svg className="layer layer-svg" viewBox={`0 0 ${lw} ${lh}`} width={lw} height={lh}>
             {svg.map((it) => <SvgElement key={keyOf(it)} item={it} ctx={ctx} />)}
           </svg>
+          {answer && (
+            <div className="layer layer-answer">
+              <div
+                className="answer-panel" role="group" aria-label="Answer panel"
+                style={{ left: answer.panel.x, top: answer.panel.y, width: answer.panel.w, height: answer.panel.h }}
+              >
+                <span className="answer-head" aria-hidden="true">Answer</span>
+                <div className="answer-scroll" ref={scroller}>
+                  <div className="answer-origin" style={{ left: -answer.panel.x, top: -answer.panel.y }}>
+                    {panelHtml.map((it) => <HtmlElement key={keyOf(it)} item={it} ctx={ctx} />)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {selected && anchor && (
             <Popover id={selected} anchor={anchor} board={{ w: lw, h: rh }} scale={s} onAskAbout={onAskAbout} onReport={onReport} />
           )}

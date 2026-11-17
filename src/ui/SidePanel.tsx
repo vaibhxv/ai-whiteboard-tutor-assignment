@@ -6,6 +6,9 @@ import { activeCheck } from '../lesson/selectors'
 import type { LessonState } from '../lesson/types'
 import type { Beat } from '../pipeline/beats'
 import { Transcript } from '../player/Transcript'
+import type { LessonController } from '../lesson/controller'
+import { InterruptPanel, SuggestedChips } from './InterruptPanel'
+import { currentSegment } from '../lesson/selectors'
 
 type Dispatch = (e: LessonEvent) => void
 
@@ -89,9 +92,43 @@ export type SidePanelProps = {
   checkpointInStage?: boolean
   transcript: Beat[]
   index: ReadonlyMap<string, Action>
+  controller: LessonController
+  /** The lesson plays a recording: typed questions, follow-ups and repeated "I'm lost" are unavailable. */
+  replay: boolean
+  onRaiseHand(): void
+  /** Narrow layout: the interrupt panel is rendered in the stage under the captions instead. */
+  interruptInStage?: boolean
 }
 
-/** The side column: objective, checkpoint (or its feedback), raised-hand stub and the transcript. */
+export const LOST_LIMIT_REASON = 'Recorded lessons include one other explanation per step.'
+
+/** Raise hand, "I'm lost" and the suggested questions of the current step. */
+function HandBar({ state, dispatch, controller, replay, onRaiseHand }: Pick<SidePanelProps, 'state' | 'dispatch' | 'controller' | 'replay' | 'onRaiseHand'>) {
+  const open = !!state.overlay
+  const seg = currentSegment(state)
+  const lostHere = seg ? Object.values(state.segments).filter((g) => g.kind === 'lost' && g.n === seg.n).length : 0
+  const lostBlocked = replay && lostHere >= 1
+  return (
+    <div className="hand-bar">
+      <div className="btn-row">
+        <button type="button" onClick={onRaiseHand} disabled={open}>✋ Raise hand</button>
+        <button
+          type="button" disabled={open || lostBlocked} aria-describedby={lostBlocked ? 'lost-reason' : undefined}
+          onClick={() => dispatch({ type: 'lost/request' })}
+        >😕 I'm lost</button>
+      </div>
+      {lostBlocked ? <p id="lost-reason" className="helper">{LOST_LIMIT_REASON}</p> : null}
+      {!open ? (
+        <SuggestedChips
+          asks={seg?.asks ?? []}
+          onAsk={(a) => { onRaiseHand(); controller.ask({ question: a.text, targets: [], askId: a.id }) }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/** The side column: objective, checkpoint (or its feedback), raise hand / lost, the interrupt panel and the transcript. */
 export function SidePanel(p: SidePanelProps) {
   const { state, dispatch } = p
   const inLesson = state.phase === 'teaching' || state.phase === 'checkpoint'
@@ -105,12 +142,12 @@ export function SidePanel(p: SidePanelProps) {
           state={state} dispatch={dispatch} selectedInFigure={p.selectedInFigure} paramValue={p.paramValue} onReplaySegment={p.onReplaySegment}
         />
       ) : null}
-      {state.overlay?.kind === 'interrupt' ? (
-        // Task 16 replaces this with the InterruptPanel.
-        <div className="card interrupt-stub">
-          <p>Your hand is up.</p>
-          <button type="button" onClick={() => dispatch({ type: 'interrupt/close', outcome: 'cancel' })}>Carry on</button>
-        </div>
+      {inLesson ? <HandBar {...p} /> : null}
+      {inLesson && !p.interruptInStage ? (
+        <InterruptPanel
+          state={state} controller={p.controller} dispatch={dispatch} index={p.index} replay={p.replay}
+          asks={currentSegment(state)?.asks ?? []}
+        />
       ) : null}
       {state.phase !== 'planning' && state.phase !== 'warmup' ? <Transcript beats={p.transcript} index={p.index} /> : null}
     </aside>

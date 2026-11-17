@@ -22,6 +22,8 @@ export const inSvgLayer = (p: Placed): boolean => !isInplot(p) && SVG.has(p.acti
 export type ViewCtx = {
   index: ReadonlyMap<string, Action>
   selected?: string
+  /** Ids of elements found wrong. */
+  struck: ReadonlySet<string>
   onSelect(id: string): void
   /** Draw-on animation of an item (undefined for static ones); `layer` picks the explore half. */
   animOf(item: Placed, layer?: 'html' | 'svg'): Anim | undefined
@@ -34,7 +36,7 @@ export type ViewCtx = {
 }
 
 export function HtmlElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
-  const p = { item, index: ctx.index, selected: ctx.selected === item.id, onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index), anim: ctx.animOf(item, 'html') }
+  const p = { item, index: ctx.index, selected: ctx.selected === item.id, struck: ctx.struck.has(item.id), onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index), anim: ctx.animOf(item, 'html') }
   switch (item.action.t) {
     case 'write': return <Write {...p} />
     case 'math':
@@ -48,7 +50,7 @@ export function HtmlElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
 }
 
 export function SvgElement({ item, ctx }: { item: Placed; ctx: ViewCtx }) {
-  const p = { item, index: ctx.index, selected: ctx.selected === item.id, onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index), anim: ctx.animOf(item, 'svg') }
+  const p = { item, index: ctx.index, selected: ctx.selected === item.id, struck: ctx.struck.has(item.id), onSelect: ctx.onSelect, label: describeAction(item.action, ctx.index), anim: ctx.animOf(item, 'svg') }
   switch (item.action.t) {
     case 'plot': return <Plot {...p} kids={ctx.kidsOf(item.id)} labels={ctx.labels} selectedId={ctx.selected} animOf={ctx.animOf} />
     case 'numberline': return <NumberLine {...p} />
