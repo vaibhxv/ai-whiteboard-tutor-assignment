@@ -15,7 +15,7 @@ const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[]
 type Group = 'replay' | 'key' | 'claude-code' | 'codex'
 const groupOf = (s: SourceId): Group => (s === 'anthropic' || s === 'openai-compatible' ? 'key' : s)
 
-type TestState = { status: 'idle' } | { status: 'testing' } | { status: 'ok' } | { status: 'fail'; kind: ErrorKind }
+type TestState = { status: 'idle' } | { status: 'testing' } | { status: 'paste' } | { status: 'ok' } | { status: 'fail'; kind: ErrorKind }
 
 export function Settings() {
   const settings = useUi((s) => s.settings)
@@ -50,14 +50,18 @@ export function Settings() {
     if (key.trim()) keyStore.set(provider, key, on)
   }
   const runTest = async () => {
-    const src = createActiveSource(settings, keyStore)
-    if (!src) { setTest({ status: 'fail', kind: 'invalid-key' }); return }
+    const src = key.trim() ? createActiveSource(settings, keyStore) : null
+    if (!src) { setTest({ status: 'paste' }); return }
     setTest({ status: 'testing' })
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
-      const r = await src.preflight()
+      const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error('timeout')), 15_000) })
+      const r = await Promise.race([src.preflight(), timeout])
       setTest(r.ready ? { status: 'ok' } : { status: 'fail', kind: (r.reason as ErrorKind) in errorKinds ? (r.reason as ErrorKind) : 'unknown' })
-    } catch {
-      setTest({ status: 'fail', kind: 'unknown' })
+    } catch (e) {
+      setTest({ status: 'fail', kind: (e as Error).message === 'timeout' ? 'offline' : 'unknown' })
+    } finally {
+      clearTimeout(timer)
     }
   }
   const forget = () => {
@@ -139,6 +143,7 @@ export function Settings() {
           </div>
           <div role="status" aria-live="polite" className="test-result">
             {test.status === 'testing' ? 'Testing…' : null}
+            {test.status === 'paste' ? 'Paste a key first.' : null}
             {test.status === 'ok' ? <span><span aria-hidden="true">✓ </span>Works</span> : null}
             {test.status === 'fail' ? (
               <span><span aria-hidden="true">✗ </span>{errorCopy(test.kind).title}. {errorCopy(test.kind).body}</span>

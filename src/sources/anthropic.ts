@@ -17,7 +17,7 @@ export function createAnthropicSource(opts: { key: string; model: string }): AiS
   return {
     id: 'anthropic',
     badge: () => liveApiBadge('Anthropic API', opts.model),
-    preflight: () => preflightGet(`${BASE}/models`, headers()),
+    preflight: () => preflightGet(`${BASE}/models`, headers(), opts.key),
     async *generate(req: GenRequest, signal: AbortSignal): AsyncGenerator<GenEvent> {
       const body = {
         model: opts.model,
@@ -28,16 +28,17 @@ export function createAnthropicSource(opts: { key: string; model: string }): AiS
       }
       let res: Response
       try {
-        res = await request(`${BASE}/messages`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }, signal)
+        res = await request(`${BASE}/messages`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }, signal, opts.key)
       } catch (e) {
         if (e instanceof SourceError && e.kind === 'aborted') { yield { type: 'done', stop: 'aborted' }; return }
         throw e
       }
       if (!res.body) throw new SourceError('unknown', 'empty response body')
-      let stop: 'end' | 'length' = 'end'
+      let stop: 'end' | 'length' = 'length' // until message_stop: a clean close without it is truncation
       let inTokens: number | undefined
       let cached: number | undefined
       let outTokens: number | undefined
+      let sawLength = false
       let model = opts.model
       try {
         for await (const m of readSSE(res.body, signal)) {
@@ -48,7 +49,7 @@ export function createAnthropicSource(opts: { key: string; model: string }): AiS
             const et = j?.error?.type
             throw new SourceError(et === 'overloaded_error' ? 'busy' : et === 'rate_limit_error' ? 'rate-limit' : 'unknown', j?.error?.message)
           }
-          if (type === 'message_start') {
+          if (type === 'message_stop') { stop = sawLength ? 'length' : 'end' } else if (type === 'message_start') {
             model = j.message?.model ?? model
             inTokens = j.message?.usage?.input_tokens
             cached = j.message?.usage?.cache_read_input_tokens
@@ -57,7 +58,7 @@ export function createAnthropicSource(opts: { key: string; model: string }): AiS
             if (j.delta?.type === 'text_delta' && typeof j.delta.text === 'string') yield { type: 'text', text: j.delta.text }
             // thinking_delta / signature_delta are ignored
           } else if (type === 'message_delta') {
-            if (j.delta?.stop_reason === 'max_tokens') stop = 'length'
+            if (j.delta?.stop_reason === 'max_tokens') sawLength = true
             outTokens = j.usage?.output_tokens ?? outTokens
             inTokens = j.usage?.input_tokens ?? inTokens
             yield {

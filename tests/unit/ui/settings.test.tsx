@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { keyStore } from '../../../src/sources/key-store'
 import { SETTINGS_KEY } from '../../../src/storage/settings'
@@ -92,4 +92,25 @@ test('"What is sent where" has a paragraph per source', async () => {
   expect(screen.getByText(/Nothing leaves your device except loading the recording file from this site/)).toBeInTheDocument()
   expect(screen.getByText(/your key is sent only to/i)).toBeInTheDocument()
   expect(screen.getByText(/Nothing goes to this site/)).toBeInTheDocument()
+})
+
+test('Test with no key says "Paste a key first." and makes no request', async () => {
+  const { user } = await open()
+  await user.click(screen.getByRole('radio', { name: 'My API key' }))
+  const f = vi.fn()
+  vi.stubGlobal('fetch', f)
+  await user.click(screen.getByRole('button', { name: 'Test' }))
+  expect(screen.getByText('Paste a key first.')).toBeInTheDocument()
+  expect(f).not.toHaveBeenCalled()
+})
+
+test('Test gives up after 15 s with the offline copy', async () => {
+  const { user } = await open()
+  await user.click(screen.getByRole('radio', { name: 'My API key' }))
+  await user.type(screen.getByLabelText('API key'), 'gk')
+  vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+  await user.click(screen.getByRole('button', { name: 'Test' }))
+  expect(screen.getByText('Testing…')).toBeInTheDocument()
+  await act(async () => { await vi.advanceTimersByTimeAsync(15_100) })
+  expect(screen.getByText(/Can't reach the internet/)).toBeInTheDocument()
 })

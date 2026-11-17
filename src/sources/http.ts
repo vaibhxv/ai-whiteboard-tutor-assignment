@@ -8,8 +8,16 @@ export function kindForStatus(status: number): ErrorKind {
   return 'unknown'
 }
 
+/** Removes the key and anything token-shaped from provider text, and caps it. */
+export function scrub(text: string, secret?: string): string {
+  let t = text
+  if (secret) t = t.split(secret).join('[key]')
+  t = t.replace(/Bearer\s+\S+/gi, 'Bearer [key]').replace(/\bsk-[A-Za-z0-9_-]+/g, '[key]').replace(/\bAIza[A-Za-z0-9_-]+/g, '[key]')
+  return t.slice(0, 300)
+}
+
 /** fetch that maps failures to SourceError (abort → aborted, TypeError → offline, !ok → by status). */
-export async function request(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+export async function request(url: string, init: RequestInit, signal?: AbortSignal, secret?: string): Promise<Response> {
   let res: Response
   try {
     res = await fetch(url, { ...init, ...(signal ? { signal } : {}) })
@@ -20,15 +28,17 @@ export async function request(url: string, init: RequestInit, signal?: AbortSign
   }
   if (!res.ok) {
     let detail = ''
-    try { detail = (await res.text()).slice(0, 500) } catch { /* ignore */ }
-    throw new SourceError(kindForStatus(res.status), `HTTP ${res.status} ${detail}`.trim())
+    if (res.status !== 401 && res.status !== 403) {
+      try { detail = await res.text() } catch { /* ignore */ }
+    }
+    throw new SourceError(kindForStatus(res.status), scrub(`HTTP ${res.status} ${detail}`.trim(), secret))
   }
   return res
 }
 
-export async function preflightGet(url: string, headers: Record<string, string>): Promise<{ ready: true } | { ready: false; reason: string; action?: string }> {
+export async function preflightGet(url: string, headers: Record<string, string>, secret?: string): Promise<{ ready: true } | { ready: false; reason: string; action?: string }> {
   try {
-    await request(url, { method: 'GET', headers })
+    await request(url, { method: 'GET', headers }, undefined, secret)
     return { ready: true }
   } catch (e) {
     const kind = e instanceof SourceError ? e.kind : 'unknown'

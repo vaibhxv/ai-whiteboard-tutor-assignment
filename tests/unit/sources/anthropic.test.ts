@@ -92,3 +92,17 @@ test('preflight GETs /models with the same headers; maps failures', async () => 
 test('badge is exact', () => {
   expect(createAnthropicSource({ key: 'k', model: 'claude-sonnet-5-5' }).badge().text).toBe('LIVE · Anthropic API · claude-sonnet-5-5')
 })
+
+test('a stream that closes without message_stop is reported as truncated (length)', async () => {
+  vi.stubGlobal('fetch', async () => resp(sse([['content_block_delta', { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hi' } }]])))
+  const out = await run(createAnthropicSource({ key: 'k', model: 'm' }))
+  expect(out.at(-1)).toEqual({ type: 'done', stop: 'length' })
+})
+
+test.each([401, 500])('HTTP %i error never carries the key in detail, message or String(e)', async (status) => {
+  const key = 'sk-ant-SECRETKEY123'
+  vi.stubGlobal('fetch', async () => new Response(`{"error":"bad key ${key} Bearer ${key}"}`, { status }))
+  const e = await run(createAnthropicSource({ key, model: 'm' })).catch((x) => x)
+  for (const t of [e.message, String(e), String(e.stack ?? '')]) expect(t).not.toContain('SECRETKEY123')
+  if (status === 401) expect(e.message).toBe('HTTP 401')
+})

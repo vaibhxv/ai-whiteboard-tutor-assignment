@@ -88,3 +88,38 @@ test('badge text per provider', () => {
   expect(createOpenAICompatibleSource({ provider: 'gemini', key: 'k', model: 'm' }).badge().text).toBe('LIVE · Gemini API · m')
   expect(createOpenAICompatibleSource({ provider: 'groq', key: 'k', model: 'm' }).badge().text).toBe('LIVE · Groq · m')
 })
+
+test('a stream that closes without [DONE] or finish_reason is truncated (length)', async () => {
+  vi.stubGlobal('fetch', async () => resp(chunk({ choices: [{ delta: { content: 'x' } }] })))
+  const out = await run(createOpenAICompatibleSource({ provider: 'openai', key: 'k', model: 'm' }))
+  expect(out.at(-1)).toEqual({ type: 'done', stop: 'length' })
+})
+
+test('finish_reason stop without [DONE] is a normal end', async () => {
+  vi.stubGlobal('fetch', async () => resp(chunk({ choices: [{ delta: { content: 'x' }, finish_reason: 'stop' }] })))
+  const out = await run(createOpenAICompatibleSource({ provider: 'openai', key: 'k', model: 'm' }))
+  expect(out.at(-1)).toEqual({ type: 'done', stop: 'end' })
+})
+
+test.each([
+  [{ code: 429 }, 'rate-limit'], [{ type: 'rate_limit_error' }, 'rate-limit'], [{ status: 'RESOURCE_EXHAUSTED' }, 'rate-limit'],
+  [{ code: 503 }, 'busy'], [{ type: 'overloaded_error' }, 'busy'], [{ type: 'server_error' }, 'busy'],
+  [{ code: 401 }, 'invalid-key'], [{ code: 'invalid_api_key' }, 'invalid-key'], [{ type: 'authentication_error' }, 'invalid-key'],
+  [{ code: 400, message: 'bad' }, 'unknown'],
+])('in-stream error %j → %s', async (error, kind) => {
+  vi.stubGlobal('fetch', async () => resp(chunk({ error })))
+  await expect(run(createOpenAICompatibleSource({ provider: 'groq', key: 'k', model: 'm' }))).rejects.toMatchObject({ kind })
+})
+
+test.each([401, 500])('HTTP %i error never carries the key', async (status) => {
+  const key = 'AIzaSECRETKEY456'
+  vi.stubGlobal('fetch', async () => new Response(`bad key ${key}; Bearer ${key}`, { status }))
+  const e = await run(createOpenAICompatibleSource({ provider: 'gemini', key, model: 'm' })).catch((x) => x)
+  for (const t of [e.message, String(e)]) expect(t).not.toContain('SECRETKEY456')
+})
+
+test('in-stream error message is scrubbed of the key', async () => {
+  vi.stubGlobal('fetch', async () => resp(chunk({ error: { code: 400, message: 'key SECRETKEY789 invalid' } })))
+  const e = await run(createOpenAICompatibleSource({ provider: 'groq', key: 'SECRETKEY789', model: 'm' })).catch((x) => x)
+  expect(String(e)).not.toContain('SECRETKEY789')
+})
