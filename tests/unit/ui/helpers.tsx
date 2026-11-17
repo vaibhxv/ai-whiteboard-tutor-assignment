@@ -42,6 +42,8 @@ export function setup() {
 
 export function teardown() {
   resetSession()
+  resetUi()
+  try { localStorage.clear() } catch { /* ignore */ }
   vi.unstubAllGlobals()
   vi.useRealTimers()
 }

@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { setSessionDeps } from '../../../src/ui/session'
 import { useUi } from '../../../src/ui/store'
 import { fakeSpeech } from '../player/helpers'
+import { FakeSource, jsonl } from '../../fixtures/fake-source'
 import { sessionStore } from '../../../src/ui/session'
-import { lesson, startVertex, setup, teardown, tick, until } from './helpers'
+import { lesson, renderApp, startVertex, setup, teardown, tick, until } from './helpers'
 
 vi.mock('../../../src/recordings/manifest', async () => ({ manifest: (await import('./manifest')).MANIFEST }))
 
@@ -160,5 +161,97 @@ describe('interrupts', () => {
     expect(el('eq1')!.className).toContain('is-struck')
     expect(el('eq1')!.querySelector('.strike-line')).not.toBeNull()
     expect(el('eq1')).toBeVisible()
+  })
+
+  test('struck points and lines inside a plot are struck through too', async () => {
+    const { user } = await startVertex()
+    await user.click(screen.getByRole('button', { name: '4' }))
+    await until(() => el('v') !== null, 60_000)
+    expect(el('v')!.className).not.toContain('is-struck')
+    await act(async () => { sessionLesson().dispatch({ type: 'element/strike', id: 'v' }) })
+    const v = el('v')!
+    expect(v.getAttribute('class')).toContain('is-struck')
+    expect(v.getAttribute('aria-label')).toMatch(/Marked as wrong\.$/)
+    expect(v.querySelector('.strike-svg')).not.toBeNull()
+    expect(v.querySelectorAll('.strike-svg line')).toHaveLength(2) // a point gets an X
+  })
+
+  test('while an answer plays or awaits "Did that clear it up?", the lesson controls stay disabled', async () => {
+    const { user } = await startVertex()
+    await toSegment2(user)
+    await user.click(screen.getByRole('button', { name: /raise hand/i }))
+    await user.click(screen.getByRole('button', { name: 'Why is the vertex the lowest point?' }))
+    for (const name of ['Back one step', 'Play', 'Forward one step', 'Replay this step']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    await until(() => !!screen.queryByText('Did that clear it up?'))
+    for (const name of ['Back one step', 'Play', 'Forward one step', 'Replay this step']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Yes, carry on' }))
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeEnabled()
+  })
+
+  test('Yes, carry on restarts the interrupted beat: speech speaks it again and its drawing re-animates', async () => {
+    const speech = fakeSpeech()
+    setSessionDeps({ speech })
+    const { user } = await startVertex()
+    await user.click(screen.getByRole('button', { name: '4' }))
+    const finishAll = () => speech.spoken.forEach((s) => s.finish())
+    await until(() => { finishAll(); return lesson()?.phase === 'checkpoint' })
+    await user.click(screen.getByLabelText(/halfway between the roots/i))
+    await user.click(screen.getByRole('button', { name: 'Check' }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    for (let i = 0; i < 400 && !(lesson()?.cursor.seg === 'seg:2' && lesson()?.cursor.beat === 1); i++) { finishAll(); await tick(20) }
+    expect(lesson()?.cursor).toEqual({ seg: 'seg:2', beat: 1 })
+    const say = speech.spoken.at(-1)!.text
+    const animating = Array.from(document.querySelectorAll('.layer [class*="anim-"]'))
+    expect(animating.length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: /raise hand/i }))
+    await user.click(screen.getByRole('button', { name: 'Why is the vertex the lowest point?' }))
+    for (let i = 0; i < 400 && !screen.queryByText('Did that clear it up?'); i++) { finishAll(); await tick(20) }
+    const spokenBefore = speech.spoken.length
+    await user.click(screen.getByRole('button', { name: 'Yes, carry on' }))
+    expect(speech.spoken.length).toBeGreaterThan(spokenBefore)
+    expect(speech.spoken.at(-1)!.text).toBe(say)
+    expect(lesson()?.cursor).toEqual({ seg: 'seg:2', beat: 1 })
+    expect(animating.every((n) => !n.isConnected)).toBe(true) // re-keyed: the drawing starts over
+    expect(document.querySelectorAll('.layer [class*="anim-"]').length).toBeGreaterThan(0)
+  })
+
+  test('live: Something looks wrong opens its own review thread; it attaches before the verdict arrives, and a second report is ignored', async () => {
+    useUi.getState().updateSettings({ sourceId: 'anthropic' })
+    const say = (text: string) => ({ t: 'say', text })
+    const plan = jsonl(
+      { t: 'scope', verdict: 'in', reason: 'ok' },
+      { t: 'objective', text: 'Learn it.' },
+      { t: 'segment', n: 1, title: 'Part 1', goal: 'g', representation: 'worked', misconception: 'm', check: 'choice' },
+    )
+    const seg = jsonl(
+      say('Look at this line.'), { t: 'math', id: 's1m', latex: '2+2=5', expr: '2+2=5' }, say('Wait.'), { t: 'write', id: 's1w', text: 'note' },
+    )
+    const verdict = jsonl({ t: 'verdict', ok: false, say: 'You are right, that line was wrong.' })
+    const src = FakeSource({ plan, 'segment:1': seg, 'review:s1m': verdict }, { delayMs: 40 })
+    setSessionDeps({ createSource: () => src })
+    const { user } = renderApp()
+    await user.type(screen.getByLabelText('What are you stuck on?'), 'a topic')
+    await user.click(screen.getByRole('button', { name: 'Start lesson' }))
+    await until(() => el('s1m') !== null, 60_000)
+    await user.click(el('s1m')!)
+    await user.click(screen.getByRole('button', { name: 'Something looks wrong' }))
+    // The controller opened the thread synchronously; the verdict has not arrived yet.
+    const open = lesson()!
+    expect(open.overlay).toMatchObject({ kind: 'interrupt', threadId: expect.any(String) })
+    expect(open.threads).toHaveLength(1)
+    expect(['pending', 'streaming']).toContain(open.threads[0]!.status)
+    expect(screen.getByRole('region', { name: 'Answer' })).toBeInTheDocument()
+    expect(screen.getByText('Thinking…')).toBeInTheDocument()
+    // A second report while the answer is open does not open a second thread.
+    await user.click(el('s1m')!)
+    await user.click(screen.getByRole('button', { name: 'Something looks wrong' }))
+    expect(lesson()?.threads).toHaveLength(1)
+    await until(() => lesson()?.threads[0]?.status === 'complete')
+    await until(() => !!screen.queryByText('Did that clear it up?'))
+    expect(lesson()?.threads).toHaveLength(1)
+    expect(lesson()?.struck).toContain('s1m')
+    expect(screen.getByRole('region', { name: 'Answer' })).toHaveTextContent('You are right, that line was wrong.')
+    expect(el('s1m')!.className).toContain('is-struck')
+    expect(src.intents().filter((i) => i === 'review:s1m')).toHaveLength(1)
   })
 })

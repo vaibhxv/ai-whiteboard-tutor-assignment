@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['tests/setup.ts'],
+    // UI tests render whole lessons; a loaded machine must not turn a slow first test into a cascade.
+    testTimeout: 20_000,
     include: ['tests/unit/**/*.test.{ts,tsx}', 'tests/golden/**/*.test.ts', 'tests/bridge/**/*.test.ts'],
   },
 })

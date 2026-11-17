@@ -131,6 +131,14 @@ export function usePlayer(store: StoreApi<LessonStore>, opts: PlayerOpts): Playe
     store.getState().dispatch({ type: 'player/advance' })
   }, [stallKey, store])
 
+  // Closing an overlay (hand lowered) replays the interrupted beat from its start, whatever else changed.
+  const overlayOpen = !!state?.overlay
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (wasOpen.current && !overlayOpen) setPlayToken((t) => t + 1)
+    wasOpen.current = overlayOpen
+  }, [overlayOpen])
+
   const setPausedBoth = (v: boolean) => { pausedRef.current = v; setPaused(v) }
 
   const togglePlay = useCallback(() => {

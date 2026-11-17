@@ -131,12 +131,13 @@ function LessonView({ session }: { session: Session }) {
     ui.setAskTargets([id])
     ui.select(undefined)
   }
+  // The controller owns the review thread's lifecycle: `report` opens it (`interrupt/ask`), which stops the
+  // lesson track. Never a second thread while an answer is already open.
   const onReport = (id: string) => {
-    onRaiseHand()
+    const cur = store.getState().state
     ui.select(undefined)
+    if (cur && interruptOf(cur)?.threadId) return
     controller.report(id)
-    // Nothing to check (not a board element): do not leave a raised hand with no question.
-    if (!store.getState().state?.overlay || !interruptOf(store.getState().state!)?.threadId) dispatch({ type: 'interrupt/close', outcome: 'cancel' })
   }
 
   // The answer being played: its own lines in the answer panel, its marks and points on the lesson page.
@@ -181,7 +182,7 @@ function LessonView({ session }: { session: Session }) {
     if (player.paused) player.togglePlay()
   }
 
-  const interrupted = interruptOf(state) && state.playback.track === 'lesson'
+  const interrupted = interruptOf(state) !== null
   const played = state.threads.flatMap((t) => (thread && t.id === thread.id ? t.beats.slice(0, answerBeat + 1) : t.beats))
   const transcript = [...player.transcriptBeats, ...played]
   const problem = state.overlay?.kind === 'problem' ? state.overlay : null

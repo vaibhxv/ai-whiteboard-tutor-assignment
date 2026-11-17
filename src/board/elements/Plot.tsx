@@ -175,9 +175,10 @@ export function PlotDrawing({ id, box, x, y, fns, geo }: { id: string; box: Box;
 }
 
 /** Points, lines and guides on a plot: each is its own focusable element, laid out against the others. */
-export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect, animOf }: {
+export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect, animOf, struck }: {
   plot: Placed; kids: Placed[]; area: Box; labels: ReadonlyMap<string, Box>; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
   animOf?: (item: Placed) => Anim | undefined
+  struck?: ReadonlySet<string>
 }) {
   const a = plot.action as Extract<Action, { t: 'plot' | 'explore' }>
   return (
@@ -190,6 +191,7 @@ export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect
           onSelect={onSelect}
           item={{ ...k, box: markTargetBox(k, plot) }}
           selected={k.id === selectedId}
+          struck={struck?.has(k.id)}
           label={describeAction(k.action, index)}
           className={`el-${k.action.t}`}
         >
@@ -201,8 +203,8 @@ export function PlotKids({ plot, kids, area, labels, index, selectedId, onSelect
   )
 }
 
-export function Plot(p: ElProps & { kids: Placed[]; labels: ReadonlyMap<string, Box>; selectedId?: string; animOf?: (item: Placed) => Anim | undefined }) {
-  const { kids, labels, selectedId, animOf, ...root } = p
+export function Plot(p: ElProps & { kids: Placed[]; labels: ReadonlyMap<string, Box>; selectedId?: string; animOf?: (item: Placed) => Anim | undefined; struckKids?: ReadonlySet<string> }) {
+  const { kids, labels, selectedId, animOf, struckKids, ...root } = p
   const a = p.item.action as Extract<Action, { t: 'plot' }>
   const fns = useMemo<PlotFn[]>(() => a.fns.map((f) => ({ id: f.id, f: compileFn(f.expr), label: f.label })), [a])
   const area = plotArea(a, p.item.box)
@@ -212,7 +214,7 @@ export function Plot(p: ElProps & { kids: Placed[]; labels: ReadonlyMap<string, 
       <SvgRoot {...root} className="el-plot">
         <PlotDrawing id={p.item.id} box={area} x={a.x} y={a.y} fns={fns} geo={geo} />
       </SvgRoot>
-      <PlotKids plot={p.item} kids={kids} area={area} labels={labels} index={p.index} selectedId={selectedId} onSelect={p.onSelect} animOf={animOf} />
+      <PlotKids plot={p.item} kids={kids} area={area} labels={labels} index={p.index} selectedId={selectedId} onSelect={p.onSelect} animOf={animOf} struck={struckKids} />
     </>
   )
 }

@@ -48,7 +48,8 @@ export function ExploreControls(p: ElProps & { values: ParamValues; onParam(name
 }
 
 /** SVG half: the live curve for the current params, plus points on it. Decorative (the HTML half is the labelled root). */
-export function ExploreFigure({ item, values, kids, labels, index, selectedId, onSelect, anim, animOf }: {
+export function ExploreFigure({ item, values, kids, labels, index, selectedId, onSelect, anim, animOf, struck }: {
+  struck?: ReadonlySet<string>
   item: Placed; labels: ReadonlyMap<string, Box>; values: ParamValues; kids: Placed[]; index: ElProps['index']; selectedId?: string; onSelect(id: string): void
   anim?: Anim; animOf?: (item: Placed) => Anim | undefined
 }) {
@@ -61,7 +62,7 @@ export function ExploreFigure({ item, values, kids, labels, index, selectedId, o
       <g className={`explore-figure ink-${item.ink}${anim ? ` ${anim.cls}` : ''}`} style={anim?.style} aria-hidden="true">
         <PlotDrawing id={item.id} box={area} x={a.x} y={a.y} fns={fns} geo={geo} />
       </g>
-      <PlotKids plot={item} kids={kids} area={area} labels={labels} index={index} selectedId={selectedId} onSelect={onSelect} animOf={animOf} />
+      <PlotKids plot={item} kids={kids} area={area} labels={labels} index={index} selectedId={selectedId} onSelect={onSelect} animOf={animOf} struck={struck} />
     </>
   )
 }

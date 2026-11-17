@@ -107,18 +107,23 @@ export function SvgRoot({
       data-el={item.id}
       data-ox={box.x}
       data-oy={box.y}
-      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}${anim ? ` ${anim.cls}` : ''}`}
+      className={`el ${className} ink-${item.ink}${selected ? ' is-selected' : ''}${struck ? ' is-struck' : ''}${anim ? ` ${anim.cls}` : ''}`}
       style={anim?.style}
       tabIndex={0}
       role={selectable ? 'button' : 'img'}
       aria-pressed={selectable ? selected : undefined}
-      aria-label={labelWith(item.action, label)}
+      aria-label={struck ? `${labelWith(item.action, label)}. Marked as wrong.` : labelWith(item.action, label)}
       onClick={selectable ? () => onSelect(item.id) : undefined}
       onKeyDown={selectable ? selectKeys(item.id, onSelect) : undefined}
     >
       <rect className="focus-ring" x={box.x - 2} y={box.y - 2} width={box.w + 4} height={box.h + 4} rx={4} />
       {children}
-      {struck && <line className="strike-svg" x1={box.x} y1={box.y + box.h / 2} x2={box.x + box.w} y2={box.y + box.h / 2} />}
+      {struck && (
+        <g className="strike-svg" aria-hidden="true">
+          <line x1={box.x} y1={box.y + box.h / 2} x2={box.x + box.w} y2={box.y + box.h / 2} />
+          {Math.max(box.w, box.h) <= 40 && <line x1={box.x} y1={box.y} x2={box.x + box.w} y2={box.y + box.h} />}
+        </g>
+      )}
     </g>
   )
 }
