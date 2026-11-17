@@ -1,5 +1,5 @@
 import { SourceError } from './errors'
-import { request, preflightGet } from './http'
+import { request, preflightGet, scrub } from './http'
 import { PROVIDERS } from './providers'
 import { readSSE } from './sse'
 import { liveApiBadge } from './types'
@@ -47,7 +47,7 @@ export function createAnthropicSource(opts: { key: string; model: string }): AiS
           const type = m.event ?? j?.type
           if (type === 'error') {
             const et = j?.error?.type
-            throw new SourceError(et === 'overloaded_error' ? 'busy' : et === 'rate_limit_error' ? 'rate-limit' : 'unknown', j?.error?.message)
+            throw new SourceError(et === 'overloaded_error' ? 'busy' : et === 'rate_limit_error' ? 'rate-limit' : 'unknown', scrub(String(j?.error?.message ?? ''), opts.key))
           }
           if (type === 'message_stop') { stop = sawLength ? 'length' : 'end' } else if (type === 'message_start') {
             model = j.message?.model ?? model
@@ -74,7 +74,7 @@ export function createAnthropicSource(opts: { key: string; model: string }): AiS
       } catch (e) {
         if (signal.aborted) { yield { type: 'done', stop: 'aborted' }; return }
         if (e instanceof SourceError) throw e
-        throw new SourceError(e instanceof TypeError ? 'offline' : 'unknown', String(e))
+        throw new SourceError(e instanceof TypeError ? 'offline' : 'unknown', scrub(String(e), opts.key))
       }
       yield { type: 'done', stop: signal.aborted ? 'aborted' : stop }
     },

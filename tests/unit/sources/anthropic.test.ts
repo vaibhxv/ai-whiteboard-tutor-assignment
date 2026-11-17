@@ -106,3 +106,14 @@ test.each([401, 500])('HTTP %i error never carries the key in detail, message or
   for (const t of [e.message, String(e), String(e.stack ?? '')]) expect(t).not.toContain('SECRETKEY123')
   if (status === 401) expect(e.message).toBe('HTTP 401')
 })
+
+test('in-stream error and fetch TypeError messages are scrubbed of the key', async () => {
+  const key = 'plainkeyXYZ987'
+  vi.stubGlobal('fetch', async () => resp(sse([['error', { type: 'error', error: { type: 'api_error', message: `bad ${key}` } }]])))
+  let e = await run(createAnthropicSource({ key, model: 'm' })).catch((x) => x)
+  for (const t of [e.message, String(e)]) expect(t).not.toContain(key)
+  vi.stubGlobal('fetch', async () => { throw new TypeError(`failed for ${key}`) })
+  e = await run(createAnthropicSource({ key, model: 'm' })).catch((x) => x)
+  expect(e.kind).toBe('offline')
+  for (const t of [e.message, String(e)]) expect(t).not.toContain(key)
+})

@@ -72,7 +72,7 @@ export function createOpenAICompatibleSource(opts: { provider: Exclude<ProviderI
       } catch (e) {
         if (signal.aborted) { yield { type: 'done', stop: 'aborted' }; return }
         if (e instanceof SourceError) throw e
-        throw new SourceError(e instanceof TypeError ? 'offline' : 'unknown', String(e))
+        throw new SourceError(e instanceof TypeError ? 'offline' : 'unknown', scrub(String(e), opts.key))
       }
       yield { type: 'done', stop: signal.aborted ? 'aborted' : stop }
     },

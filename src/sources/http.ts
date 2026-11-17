@@ -23,8 +23,8 @@ export async function request(url: string, init: RequestInit, signal?: AbortSign
     res = await fetch(url, { ...init, ...(signal ? { signal } : {}) })
   } catch (e) {
     if (signal?.aborted || (e as { name?: string })?.name === 'AbortError') throw new SourceError('aborted')
-    if (e instanceof TypeError) throw new SourceError('offline', e.message)
-    throw new SourceError('unknown', String(e))
+    if (e instanceof TypeError) throw new SourceError('offline', scrub(e.message, secret))
+    throw new SourceError('unknown', scrub(String(e), secret))
   }
   if (!res.ok) {
     let detail = ''
