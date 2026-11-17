@@ -2,7 +2,7 @@ import { act, screen, within } from '@testing-library/react'
 import { entries } from 'idb-keyval'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { LessonEvent } from '../../../src/lesson/events'
-import { getActive, listLessons, saveLesson } from '../../../src/storage/history'
+import { deleteAll, getActive, listLessons, saveLesson } from '../../../src/storage/history'
 import { resetSession, sessionStore, setSessionDeps } from '../../../src/ui/session'
 import { resetUi, useUi } from '../../../src/ui/store'
 import { fakeSpeech } from '../player/helpers'
@@ -13,7 +13,7 @@ import { fixture, lesson, playToRecap, renderApp, setup, startVertex, stubFetch,
 vi.mock('../../../src/recordings/manifest', async () => ({ manifest: (await import('./manifest')).MANIFEST }))
 
 beforeEach(setup)
-afterEach(teardown)
+afterEach(async () => { vi.restoreAllMocks(); await teardown() })
 
 const begin = (over: Partial<Extract<LessonEvent, { type: 'lesson/start' }>>): LessonEvent => ({ type: 'lesson/start', id: 'L1', topic: 'vertex form', badge: { mode: 'recorded', text: 'RECORDED · m · captured 1 Nov 2026', model: 'm', billedTo: 'recording' }, at: '2026-11-16T10:00:00.000Z', ...over })
 const log = () => sessionStore.getState().session!.store.getState().log
@@ -150,5 +150,39 @@ describe('history and resume', () => {
     expect(screen.getByText("History isn't available in this browser.")).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('heading', { name: /stuck on a maths idea/i })).toBeInTheDocument()
+  })
+
+  test('saves land at least every 2 s while events keep arriving', async () => {
+    await startVertex()
+    await tick(10_000)
+    const st = sessionStore.getState().session!
+    // Re-open a quiet log so only these synthetic events matter.
+    await act(async () => { const p = deleteAll(); await vi.advanceTimersByTimeAsync(100); await p })
+    for (let i = 0; i < 15; i++) {
+      st.store.getState().dispatch({ type: 'warmup/skip' }) // any event wakes the subscriber
+      await tick(200)
+    }
+    const list = await act(async () => { const p = listLessons(); await vi.advanceTimersByTimeAsync(100); return p })
+    expect(list).toHaveLength(1)
+  })
+
+  test('deleting the open lesson while events keep arriving does not resurrect it', async () => {
+    const { user } = await startVertex()
+    await tick(10_000)
+    await settle()
+    await user.click(screen.getByRole('button', { name: 'History' }))
+    await tick(200)
+    const st = sessionStore.getState().session!
+    const topic = st.store.getState().state!.topic
+    await until(() => !!screen.queryByRole('button', { name: `Delete ${topic}` }), 3000, 50)
+    await user.click(screen.getByRole('button', { name: `Delete ${topic}` }))
+    await user.click(screen.getByRole('button', { name: 'Yes' }))
+    st.store.getState().dispatch({ type: 'warmup/skip' }) // a late event
+    window.dispatchEvent(new Event('pagehide'))
+    await tick(3000)
+    const [list, active] = await act(async () => { const p = Promise.all([listLessons(), getActive()]); await vi.advanceTimersByTimeAsync(200); return p })
+    expect(list).toEqual([])
+    expect(active).toBeNull()
+    expect(sessionStore.getState().session).toBeNull()
   })
 })

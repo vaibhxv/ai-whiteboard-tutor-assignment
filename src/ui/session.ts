@@ -98,13 +98,17 @@ let unwatch: (() => void) | undefined
 
 /** Saves the open lesson 500 ms after its last event, and at once on `pagehide` (best effort: IDB is async). */
 const SAVE_DELAY_MS = 500
+/** While events keep arriving (a streaming lesson), a save still lands at least this often. */
+const SAVE_MAX_WAIT_MS = 2000
 let persistor: { flush(): void; stop(): void } | undefined
 
 function persist(s: Session): void {
   let timer: ReturnType<typeof setTimeout> | undefined
+  let firstPending = 0
   const save = () => {
     if (timer !== undefined) clearTimeout(timer)
     timer = undefined
+    firstPending = 0
     const { state, log } = s.store.getState()
     if (!state || state.phase === 'planning' || state.plan.length === 0 || state.scope?.verdict === 'declined') return
     const done = state.phase === 'done'
@@ -115,7 +119,9 @@ function persist(s: Session): void {
   }
   const unsub = s.store.subscribe(() => {
     if (timer !== undefined) clearTimeout(timer)
-    timer = setTimeout(save, SAVE_DELAY_MS)
+    const now = Date.now()
+    if (!firstPending) firstPending = now
+    timer = setTimeout(save, Math.max(0, Math.min(SAVE_DELAY_MS, firstPending + SAVE_MAX_WAIT_MS - now)))
   })
   const onHide = () => save()
   if (typeof window !== 'undefined') window.addEventListener('pagehide', onHide)

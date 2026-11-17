@@ -34,6 +34,15 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
   return run
 }
 
+const READ_TIMEOUT_MS = 3000
+/** A read that never settles (blocked IndexedDB) rejects, so the UI can say history is unavailable. */
+function timed<T>(p: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('history: storage timed out')), READ_TIMEOUT_MS)
+    p.then((v) => { clearTimeout(t); resolve(v) }, (e) => { clearTimeout(t); reject(e) })
+  })
+}
+
 const str = (v: unknown): v is string => typeof v === 'string'
 
 function cleanSource(v: unknown): SourceRef {
@@ -72,14 +81,16 @@ async function readIndex(): Promise<Summary[]> {
 }
 
 /** Newest first. Rejects when storage is unavailable (the History screen says so). */
-export async function listLessons(): Promise<Summary[]> {
+export const listLessons = (): Promise<Summary[]> => timed(listAll())
+async function listAll(): Promise<Summary[]> {
   await chain
   const list = await readIndex()
   return list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
 }
 
 /** The stored log and summary, or null when missing or corrupt. */
-export async function loadEntry(id: string): Promise<{ log: LessonEvent[]; summary: Summary | null } | null> {
+export const loadEntry = (id: string) => timed(readEntry(id))
+async function readEntry(id: string): Promise<{ log: LessonEvent[]; summary: Summary | null } | null> {
   await chain
   const raw = await get<{ log?: unknown; summary?: unknown }>(lessonKey(id))
   if (!raw || !validLog(raw.log)) return null
@@ -90,7 +101,8 @@ export async function loadLesson(id: string): Promise<LessonEvent[]> {
   return (await loadEntry(id))?.log ?? []
 }
 
-export async function getActive(): Promise<string | null> {
+export const getActive = (): Promise<string | null> => timed(readActive())
+async function readActive(): Promise<string | null> {
   await chain
   const v = await get<unknown>(ACTIVE)
   return str(v) ? v : null

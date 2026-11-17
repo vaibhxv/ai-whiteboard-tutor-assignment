@@ -24,14 +24,12 @@ export function History() {
   useEffect(() => { void refresh() }, [refresh])
 
   const remove = async (id: string | 'all') => {
+    // Stop the open lesson's persistor first, so no late save can resurrect what is being deleted.
+    const cur = sessionStore.getState().session
+    if (cur && (id === 'all' || cur.store.getState().state?.id === id)) endSession(true)
     if (id === 'all') await deleteAll()
     else await deleteLesson(id)
     setConfirm(null)
-    // Deleting the lesson that is open ends it, so it cannot be saved back.
-    const cur = sessionStore.getState().session
-    if (cur && (id === 'all' || cur.store.getState().state?.id === id)) {
-      endSession(true)
-    }
     await refresh()
   }
   const open = async (id: string) => {
