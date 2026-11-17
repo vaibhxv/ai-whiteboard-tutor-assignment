@@ -6,6 +6,7 @@ import { settingsBadge } from './sources/create'
 import type { Badge } from './sources/types'
 import { History } from './ui/History'
 import { Home } from './ui/Home'
+import { Settings } from './ui/Settings'
 import { LessonScreen } from './ui/LessonScreen'
 import { leaveLesson, resumeActive, useSession } from './ui/session'
 import { SourceBadge } from './ui/SourceBadge'
@@ -46,19 +47,6 @@ function Header() {
   )
 }
 
-/** Placeholder until Task 18 builds the Settings screen. */
-function SettingsScreen() {
-  const go = useUi((s) => s.go)
-  const inLesson = useSession((s) => !!s.session)
-  return (
-    <main className="settings" id="main">
-      <h2>Settings</h2>
-      <p>Choosing an AI source arrives in a later build. For now Whyboard plays recorded lessons.</p>
-      <button type="button" onClick={() => go(inLesson ? 'lesson' : 'home')}>{inLesson ? 'Back to lesson' : 'Back'}</button>
-    </main>
-  )
-}
-
 export default function App() {
   const screen = useUi((s) => s.screen)
   // A lesson that was in progress when the page went away comes back (once per page load).
@@ -71,7 +59,7 @@ export default function App() {
       <Header />
       {screen === 'home' ? <Home /> : null}
       {screen === 'lesson' ? <LessonScreen /> : null}
-      {screen === 'settings' ? <SettingsScreen /> : null}
+      {screen === 'settings' ? <Settings /> : null}
       {screen === 'history' ? <History /> : null}
     </div>
   )

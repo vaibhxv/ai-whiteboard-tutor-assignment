@@ -16,7 +16,8 @@ import type { LessonStore } from '../lesson/store'
 import type { Speech } from '../player/speech'
 import { TOPIC_MAX } from '../prompts/context'
 import { manifest } from '../recordings/manifest'
-import { createActiveSource, noKeys } from '../sources/create'
+import { createActiveSource } from '../sources/create'
+import { keyStore } from '../sources/key-store'
 import { RecordingSchema } from '../sources/recording'
 import type { Recording } from '../sources/recording'
 import { createReplaySource } from '../sources/replay'
@@ -234,7 +235,7 @@ export async function startLesson(input: StartInput): Promise<boolean> {
   const topic = capChars(input.topic, TOPIC_MAX)
   if (!topic) return false
   const settings = ui.settings
-  const source = deps.createSource ? deps.createSource(settings) : createActiveSource(settings, noKeys)
+  const source = deps.createSource ? deps.createSource(settings) : createActiveSource(settings, keyStore)
   if (!source) {
     ui.setNotice("Your chosen AI source isn't connected yet. Open Settings to set it up.")
     return false
@@ -267,7 +268,7 @@ async function sourceFor(ref: SourceRef): Promise<AiSource | null> {
     return rec ? createReplaySource(rec, deps.replay) : null
   }
   const settings = useUi.getState().settings
-  const src = deps.createSource ? deps.createSource(settings) : createActiveSource(settings, noKeys)
+  const src = deps.createSource ? deps.createSource(settings) : createActiveSource(settings, keyStore)
   if (!src || src.id !== ref.sourceId) return null
   if (ref.provider && settings.provider !== ref.provider) return null
   if (ref.model && src.badge().model !== ref.model) return null

@@ -4,6 +4,9 @@
  */
 import type { ProviderId, Settings } from '../storage/settings'
 import type { Recording } from './recording'
+import { createAnthropicSource } from './anthropic'
+import { createOpenAICompatibleSource } from './openai-compatible'
+import { PROVIDERS } from './providers'
 import { createReplaySource } from './replay'
 import type { ReplayOpts } from './replay'
 import { liveApiBadge, liveCliBadge } from './types'
@@ -19,19 +22,33 @@ export const noKeys: KeyLookup = { get: () => undefined }
 export type ActiveSourceOpts = { recording?: Recording; replay?: ReplayOpts }
 
 /** The source for a new lesson, or null when the chosen source is not available (yet). */
-export function createActiveSource(settings: Settings, _keyStore: KeyLookup, opts: ActiveSourceOpts = {}): AiSource | null {
+export function createActiveSource(settings: Settings, keyStore: KeyLookup, opts: ActiveSourceOpts = {}): AiSource | null {
   switch (settings.sourceId) {
     case 'replay':
       return opts.recording ? createReplaySource(opts.recording, opts.replay) : null
+    case 'anthropic': {
+      const key = keyStore.get('anthropic')
+      return key ? createAnthropicSource({ key, model: settings.model ?? PROVIDERS.anthropic.defaultModel }) : null
+    }
+    case 'openai-compatible': {
+      const provider = compatProvider(settings)
+      const key = keyStore.get(provider)
+      return key ? createOpenAICompatibleSource({ provider, key, model: settings.model ?? DEFAULT_MODELS[provider] }) : null
+    }
     default:
-      return null // Task 18 (API keys) and Task 19 (subscriptions)
+      return null // Task 19 (subscriptions)
   }
 }
 
-const LABELS: Record<ProviderId, ProviderLabel> = {
+/** The OpenAI-compatible provider a setting names (Gemini when none is chosen). */
+export function compatProvider(s: Settings): Exclude<ProviderId, 'anthropic'> {
+  return s.provider && s.provider !== 'anthropic' ? s.provider : 'gemini'
+}
+
+export const LABELS: Record<ProviderId, ProviderLabel> = {
   anthropic: 'Anthropic API', openai: 'OpenAI API', gemini: 'Gemini API', openrouter: 'OpenRouter', groq: 'Groq',
 }
-const DEFAULT_MODELS: Record<ProviderId, string> = {
+export const DEFAULT_MODELS: Record<ProviderId, string> = {
   anthropic: 'claude-sonnet-5-5', openai: 'gpt-6.1-terra', gemini: 'gemini-3.8-flash',
   openrouter: 'anthropic/claude-sonnet-5.5', groq: 'openai/gpt-oss-120b',
 }
@@ -44,7 +61,7 @@ export function settingsBadge(s: Settings): Badge {
     case 'anthropic':
       return liveApiBadge('Anthropic API', s.model ?? DEFAULT_MODELS.anthropic)
     case 'openai-compatible': {
-      const p = s.provider && s.provider !== 'anthropic' ? s.provider : 'gemini'
+      const p = compatProvider(s)
       return liveApiBadge(LABELS[p], s.model ?? DEFAULT_MODELS[p])
     }
     case 'claude-code':

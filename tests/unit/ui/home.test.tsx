@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { keyStore } from '../../../src/sources/key-store'
 import { jsonl } from '../../fixtures/fake-source'
 import type { AiSource, GenEvent, GenRequest } from '../../../src/sources/types'
 import { SETTINGS_KEY } from '../../../src/storage/settings'
@@ -106,6 +107,36 @@ describe('Home', () => {
     await user.click(screen.getByRole('button', { name: /an odd topic/i }))
     await until(() => lesson()?.phase === 'warmup', 3000, 50)
     expect(screen.getByText("Outside my checked zone. I can explain and sketch, but I can't verify this the way I verify maths.")).toBeInTheDocument()
+  })
+
+  test('a live API-key source enables the topic box and starts a lesson through a mocked provider stream', async () => {
+    keyStore.set('gemini', 'gk', false)
+    useUi.getState().updateSettings({ sourceId: 'openai-compatible', provider: 'gemini' })
+    const plan = jsonl({ t: 'scope', verdict: 'declined', reason: 'Not maths.', suggest: ['A', 'B'] })
+    const f = vi.fn(async (_u: string, _i?: RequestInit) =>
+      new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: plan } }] })}\n\ndata: [DONE]\n\n`, { status: 200 }))
+    vi.stubGlobal('fetch', f)
+    const { user } = renderApp()
+    const box = screen.getByLabelText('What are you stuck on?')
+    expect(box).toBeEnabled()
+    expect(screen.getByTestId('source-badge')).toHaveTextContent('LIVE · Gemini API · gemini-3.8-flash')
+    await user.type(box, 'completing the square')
+    await user.click(screen.getByRole('button', { name: 'Start lesson' }))
+    await tick(200)
+    expect(f).toHaveBeenCalled()
+    const [url, init] = f.mock.calls[0]!
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions')
+    expect(JSON.parse(init!.body as string).messages[1].content).toContain('completing the square')
+    keyStore.forgetAll()
+  })
+
+  test('a live source with no key says it is not connected instead of starting', async () => {
+    keyStore.forgetAll()
+    useUi.getState().updateSettings({ sourceId: 'anthropic' })
+    const { user } = renderApp()
+    await user.type(screen.getByLabelText('What are you stuck on?'), 'x')
+    await user.click(screen.getByRole('button', { name: 'Start lesson' }))
+    expect(await screen.findByText(/isn't connected yet/)).toBeInTheDocument()
   })
 
   test('settings persist under whyboard.settings without unknown fields', () => {
