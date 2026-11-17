@@ -1,4 +1,5 @@
 import type { Action } from '../actions'
+import { compile, parseMath } from '../maths/safe'
 import { clampBox } from './labels'
 import { plotArea, plotTransform } from './plot-transform'
 import type { Box, MarkKind, Placed } from './types'
@@ -80,4 +81,33 @@ export function markTargetBox(target: Placed, parent?: Placed): Box {
   else if (a.t === 'guide' && a.y !== undefined) box = { ...around(toPx([0, a.y])), x: inner.x, w: inner.w }
   else return area
   return clampBox(box, area)
+}
+
+/**
+ * The box a mark wraps when it names a plot's curve: 16×16 at the curve's point at the plot's visible
+ * x-midpoint, or at the first finite point scanning the x range (and inside the y range) if the midpoint
+ * has none. Null when the curve has no visible point, so the mark is dropped.
+ */
+export function curveTargetBox(plot: Placed, expr: string): Box | null {
+  const a = plot.action
+  if (a.t !== 'plot' && a.t !== 'explore') return null
+  const parsed = parseMath(expr)
+  if (!parsed.ok || parsed.value.kind !== 'expr') return null
+  const f = compile(parsed.value.node)
+  const area = plotArea(a, plot.box)
+  const { toPx } = plotTransform(area, a.x, a.y)
+  const [x0, x1] = a.x
+  const visible = (v: number) => Number.isFinite(v) && v >= a.y[0] && v <= a.y[1]
+  const at = (x: number): Box | null => {
+    const y = f({ x })
+    return visible(y) ? clampBox(around(toPx([x, y])), area) : null
+  }
+  const mid = at((x0 + x1) / 2)
+  if (mid) return mid
+  const N = 200
+  for (let i = 0; i <= N; i++) {
+    const b = at(x0 + ((x1 - x0) * i) / N)
+    if (b) return b
+  }
+  return null
 }

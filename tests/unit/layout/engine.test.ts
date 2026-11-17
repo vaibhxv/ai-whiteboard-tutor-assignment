@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import type { Action } from '../../../src/actions'
 import { BOARD } from '../../../src/layout/constants'
 import { paginate, templateFor } from '../../../src/layout/engine'
 import type { Box, Page, Placed } from '../../../src/layout/types'
@@ -51,6 +52,20 @@ describe('paginate', () => {
     expect(under.box.h).toBe(6)
     expect(under.box.y).toBeGreaterThanOrEqual(roots.y + roots.h)
     expect(new Set(marks.map((i) => i.id)).size).toBe(2)
+  })
+
+  test('a mark on a curve id sits on the curve inside the plot; a curve with no visible point drops the mark', () => {
+    const empty: Action = { t: 'plot', id: 'pe', x: [0, 4], y: [10, 20], fns: [{ id: 'pef', expr: 'x' }] }
+    const [p] = paginate([{ segKey: 'seg:1', template: 'split', beats: [beat('seg:1#0', [plot('p1')]), beat('seg:1#1', [mark('p1f')])] }], fake, 'wide')
+    const plotBox = find(p, 'p1')?.box as Box
+    const marks = (p as Page).items.filter((i) => i.region === 'overlay')
+    expect(marks).toHaveLength(1)
+    const circle = marks[0] as Placed
+    expect(circle.box.w).toBeLessThan(60)
+    expect(inside(circle.box, plotBox)).toBe(true)
+    const [q] = paginate([{ segKey: 'seg:1', template: 'split', beats: [beat('seg:1#0', [empty, mark('pef')])] }], fake, 'wide')
+    expect((q as Page).items.filter((i) => i.region === 'overlay')).toHaveLength(0)
+    expect((q as Page).dropped).toHaveLength(1)
   })
 
   test('same at narrow: everything in one column inside 600×1000', () => {

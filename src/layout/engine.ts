@@ -3,7 +3,7 @@ import type { Checked } from '../maths/verify'
 import type { Beat } from '../pipeline/beats'
 import { boardBox, EXPLORE_PARAM_H, GAP, geometry } from './constants'
 import type { Geometry } from './constants'
-import { markGeometry, markTargetBox } from './marks'
+import { curveTargetBox, markGeometry, markTargetBox } from './marks'
 import type { Box, Measurer, Page, Placed, Template, Viewport } from './types'
 
 type Representation = Extract<PlanRecord, { t: 'segment' }>['representation']
@@ -125,7 +125,16 @@ function placeBeat(b: Build, beat: BeatLike, m: Measurer, vp: Viewport, force: b
     } else if (a.t === 'mark') {
       const id = markId(beat.id, s.i)
       const target = find(a.target)
-      if (!target) { dropped.push(id); continue }
+      if (!target) {
+        // a plot's curve (fn id): wrap the curve at the plot's visible midpoint
+        const plots = [...items, ...b.page.items].filter((p) => p.region !== 'overlay' && p.region !== 'inplot' && isPlotLike(p.action))
+        const owner = plots.find((p) => p.action.t === 'plot' && p.action.fns.some((f) => f.id === a.target))
+        const fn = owner && owner.action.t === 'plot' ? owner.action.fns.find((f) => f.id === a.target) : undefined
+        const box = owner && fn ? curveTargetBox(owner, fn.expr) : null
+        if (!box) { dropped.push(id); continue }
+        put(a, id, markGeometry(a.kind, box, bounds).shape, 'overlay')
+        continue
+      }
       const parent = target.region === 'inplot' && target.parent !== undefined ? find(target.parent) : undefined
       put(a, id, markGeometry(a.kind, markTargetBox(target, parent), bounds).shape, 'overlay')
     }

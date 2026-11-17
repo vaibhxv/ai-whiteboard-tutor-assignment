@@ -198,7 +198,7 @@ async function main() {
   const md: string[] = []
   md.push('# Evaluation', '')
   md.push(`- Date: ${date}`, `- Model: ${modelSeen.v || model} (via Claude Code, ${cli})`, `- Topics: ${sc.length} in scope + ${rows.length - sc.length} probes. Each runs \`plan\` and, when not declined, \`segment:1\`, once, with no retries. One repair call is made per step that fails verification, as the app does.`, '')
-  md.push('## Per topic', '')
+  md.push('- How the recorded starter lessons were made: see [recordings.md](recordings.md).', '', '## Per topic', '')
   md.push('| Topic | Scope | Plan segs | Plan lines rejected | Seg-1 lines (ok / rejected) | Failed steps before / after repair | math+step with expr | Checkpoint valid | First time clean | Seconds |')
   md.push('|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows.filter((x) => !x.probe)) {

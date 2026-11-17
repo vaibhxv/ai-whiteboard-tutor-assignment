@@ -5,7 +5,7 @@
     "via": "claude-code",
     "capturedAt": "2026-11-17",
     "actionsVersion": 1,
-    "selection": "best of up to 8 runs per response; text unedited; attempts: plan=1, segment:1=1, segment:2=1, segment:3=1, segment:4=1, reteach:s1c:b=1, reteach:s1c:c=1, reteach:s1c:d=1, reteach:s2c:a0=1, reteach:s2c:a1=1, reteach:s2c:other=1, reteach:s3c:a0=1, reteach:s3c:a1=1, reteach:s3c:other=1, reteach:s4c:other=2, solution:s1c=1, solution:s2c=1, solution:s3c=1, solution:s4c=2, lost:1:1=4, lost:2:1=1, lost:3:1=1, lost:4:1=1, answer:s1q1=1, answer:s1q2=1, answer:s2q1=1, answer:s2q2=1, answer:s3q1=1, answer:s3q2=1, answer:s4q1=1, answer:s4q2=1, recap=1"
+    "selection": "Disclosure: the recording run stopped once at lost:1:1 (3 failed attempts) and was resumed with max attempts 8; responses accepted before the stop were kept as they were. best of up to 8 runs per response; text unedited; attempts: plan=1, segment:1=1, segment:2=1, segment:3=1, segment:4=1, reteach:s1c:b=1, reteach:s1c:c=1, reteach:s1c:d=1, reteach:s2c:a0=1, reteach:s2c:a1=1, reteach:s2c:other=1, reteach:s3c:a0=1, reteach:s3c:a1=1, reteach:s3c:other=1, reteach:s4c:other=2, solution:s1c=1, solution:s2c=1, solution:s3c=1, solution:s4c=2, lost:1:1=4, lost:2:1=1, lost:3:1=1, lost:4:1=1, answer:s1q1=1, answer:s1q2=1, answer:s2q1=1, answer:s2q2=1, answer:s3q1=1, answer:s3q2=1, answer:s4q1=1, answer:s4q2=1, recap=1"
   },
   "responses": {
     "plan": {

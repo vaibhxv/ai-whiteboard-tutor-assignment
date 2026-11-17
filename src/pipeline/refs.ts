@@ -33,7 +33,8 @@ export function checkRefs(
   }
   switch (a.t) {
     case 'mark':
-      if (!exists(a.target)) return bad(`unknown target ${a.target}`)
+      // A mark may name a plot's curve (a fn id) as well as an element id.
+      if (!exists(a.target) && !taken(a.target)) return bad(`unknown target ${a.target}`)
       break
     case 'point': {
       const p = plotOf(a.plot)

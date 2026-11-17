@@ -5,7 +5,7 @@
     "via": "claude-code",
     "capturedAt": "2026-11-17",
     "actionsVersion": 1,
-    "selection": "best of up to 5 runs per response; text unedited; attempts: plan=1, segment:1=1, segment:2=1, segment:3=1, segment:4=1, reteach:s1c:other=1, reteach:s2c:a0=1, reteach:s2c:a1=1, reteach:s2c:other=1, reteach:s3c:b=1, reteach:s3c:c=1, reteach:s3c:d=1, reteach:s4c:other=1, solution:s1c=1, solution:s2c=1, solution:s3c=1, solution:s4c=1, lost:1:1=1, lost:2:1=1, lost:3:1=1, lost:4:1=1, answer:s1q1=1, answer:s1q2=1, answer:s2q1=2, answer:s2q2=1, answer:s3q1=1, answer:s3q2=2, answer:s4q1=1, answer:s4q2=1, recap=1"
+    "selection": "Disclosure: an earlier complete recording of this lesson (about 45 calls) was discarded and the lesson re-recorded from scratch, because solution:s1c failed validation 8 times (the model marked a plot curve id that the app rejected at the time). Only this second recording is shipped. best of up to 5 runs per response; text unedited; attempts: plan=1, segment:1=1, segment:2=1, segment:3=1, segment:4=1, reteach:s1c:other=1, reteach:s2c:a0=1, reteach:s2c:a1=1, reteach:s2c:other=1, reteach:s3c:b=1, reteach:s3c:c=1, reteach:s3c:d=1, reteach:s4c:other=1, solution:s1c=1, solution:s2c=1, solution:s3c=1, solution:s4c=1, lost:1:1=1, lost:2:1=1, lost:3:1=1, lost:4:1=1, answer:s1q1=1, answer:s1q2=1, answer:s2q1=2, answer:s2q2=1, answer:s3q1=1, answer:s3q2=2, answer:s4q1=1, answer:s4q2=1, recap=1"
   },
   "responses": {
     "plan": {

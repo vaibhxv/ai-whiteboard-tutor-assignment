@@ -4,6 +4,9 @@
 - Model: claude-sonnet-5-5 (via Claude Code, 2.1.326 (Claude Code))
 - Topics: 16 in scope + 4 probes. Each runs `plan` and, when not declined, `segment:1`, once, with no retries. One repair call is made per step that fails verification, as the app does.
 
+- **This is the second run.** The first run had a bug in my checkpoint-validity check (it counted the check's own id as a duplicate), so it was re-run after fixing it. The first run's figures were: 11 of 16 segments clean first time, 5 failed steps before repair. Its checkpoint-validity count (12 of 16) was wrong because of that bug (it wrongly failed some tap and set checks) and is not comparable. Both runs are single, unretried runs; the differences between them show how much the numbers move from run to run.
+- How the recorded starter lessons were made: see [recordings.md](recordings.md).
+
 ## Per topic
 
 | Topic | Scope | Plan segs | Plan lines rejected | Seg-1 lines (ok / rejected) | Failed steps before / after repair | math+step with expr | Checkpoint valid | First time clean | Seconds |

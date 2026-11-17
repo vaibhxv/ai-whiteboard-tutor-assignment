@@ -13,6 +13,11 @@ describe('checkRefs', () => {
     expect(checkRefs({ t: 'mark', kind: 'circle', target: 'm1' }, idx(math), none)).toEqual({ ok: true })
     expect(checkRefs({ t: 'mark', kind: 'circle', target: 'm1' }, idx(), new Set(['m1']))).toEqual({ ok: true })
   })
+  test('mark on a curve (fn id) of an existing plot is accepted; an unknown id is not', () => {
+    expect(checkRefs({ t: 'mark', kind: 'circle', target: 'f1' }, idx(plot), none)).toEqual({ ok: true })
+    expect(checkRefs({ t: 'mark', kind: 'circle', target: 'f9' }, idx(plot), none)).toEqual({ ok: false, reason: 'unknown target f9' })
+    expect(checkRefs({ t: 'mark', kind: 'circle', target: 'f1' }, idx(), none).ok).toBe(false)
+  })
   test('duplicate id across segments', () => {
     const r = checkRefs({ t: 'math', id: 'm1', latex: 'y' }, idx(math), none)
     expect(r.ok).toBe(false)
