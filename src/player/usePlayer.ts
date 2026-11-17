@@ -25,6 +25,8 @@ export type PlayerOpts = {
   clock?: Clock
   speech?: Speech
   initialSpeed?: number
+  /** Start paused (a resumed lesson speaks only after the learner's click). */
+  startPaused?: boolean
   /** Bind the global player keys (default true). */
   keys?: boolean
 }
@@ -56,12 +58,12 @@ export type Player = {
 
 export function usePlayer(store: StoreApi<LessonStore>, opts: PlayerOpts): Player {
   const state = useStore(store, (s) => s.state)
-  const [paused, setPaused] = useState(false)
+  const [paused, setPaused] = useState(opts.startPaused ?? false)
   const [muted, setMuted] = useState(false)
   const [speed, setSpeedState] = useState(opts.initialSpeed ?? 1)
   const [playToken, setPlayToken] = useState(0)
   const [currentSay, setSay] = useState('')
-  const pausedRef = useRef(false)
+  const pausedRef = useRef(opts.startPaused ?? false)
   const mutedRef = useRef(false)
   const speedRef = useRef(speed)
   const playingRef = useRef<string | null>(null)

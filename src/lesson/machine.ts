@@ -63,6 +63,27 @@ function problem(s: LessonState, e: EventOf<'error'> | EventOf<'error/clear'>): 
   return { ...s, overlay: { kind: 'problem', error: e.error, retry: e.retry, ...(prev ? { prev } : {}) } }
 }
 
+/**
+ * A reopened lesson: nothing is in flight any more. Streaming segments restart as pending (their partial
+ * content is dropped), unfinished answers fail, a streaming recap restarts, and any overlay closes. The
+ * cursor stays where it was.
+ */
+function resumed(s: LessonState): LessonState {
+  const segments = { ...s.segments }
+  for (const g of Object.values(s.segments)) {
+    if (g.status !== 'streaming') continue
+    const { check: _drop, ...rest } = g
+    segments[g.key] = { ...rest, status: 'pending', beats: [], asks: [] }
+  }
+  const threads = s.threads.map((t) => (t.status === 'streaming' || t.status === 'pending' ? { ...t, status: 'failed' as const } : t))
+  let recap = s.recap
+  if (recap?.status === 'streaming') {
+    const { say: _say, ...rest } = recap
+    recap = { ...rest, status: 'pending', ideas: [], practice: [] }
+  }
+  return { ...s, segments, threads, ...(recap ? { recap } : {}), overlay: null, playback: { track: 'lesson' } }
+}
+
 export function reduce(state: LessonState | null, e: LessonEvent): LessonState {
   if (e.type === 'lesson/start') return start(e)
   if (!state) throw new Error(`lesson: '${e.type}' before 'lesson/start'`)
@@ -104,6 +125,7 @@ export function reduce(state: LessonState | null, e: LessonEvent): LessonState {
     case 'error':
     case 'error/clear': return problem(s, e)
     case 'lesson/done': return s.phase === 'done' ? s : { ...s, phase: 'done' }
+    case 'lesson/resumed': return resumed(s)
   }
 }
 

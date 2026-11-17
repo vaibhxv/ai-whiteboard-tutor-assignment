@@ -20,6 +20,7 @@ import { buildIndex, segmentTitle, selectedInFigure } from './lesson-view'
 import { Practice } from './Practice'
 import { ProblemOverlay } from './ProblemOverlay'
 import { ProgressRail } from './ProgressRail'
+import { ReadOnlyLesson } from './ReadOnlyLesson'
 import { Recap } from './Recap'
 import { ReviewView } from './ReviewView'
 import { boardMeasurer, leaveLesson, sessionDeps, useSession } from './session'
@@ -81,6 +82,7 @@ export function LessonScreen() {
       </main>
     )
   }
+  if (session.readOnly) return <ReadOnlyLesson key={session.id} session={session} />
   return <LessonView key={session.id} session={session} />
 }
 
@@ -99,7 +101,7 @@ function LessonView({ session }: { session: Session }) {
   const maxHeight = useBoardMaxHeight(stageRef, railKey)
   const measurer = useMemo(boardMeasurer, [])
   const player = usePlayer(store, {
-    measureRoot: stageRef, viewport, measurer, initialSpeed: ui.speed, speech: sessionDeps().speech,
+    measureRoot: stageRef, viewport, measurer, initialSpeed: ui.speed, speech: sessionDeps().speech, startPaused: !!session.resumed,
   })
 
   // Mute follows the saved setting, and later toggles (button or M key) are saved.
@@ -151,6 +153,9 @@ function LessonView({ session }: { session: Session }) {
   }, [thread, answerBeat, player.pages, player.pageIndex, player.visibleBeats, measurer, viewport])
   const struck = useMemo<ReadonlySet<string>>(() => new Set(state?.struck ?? []), [state?.struck])
 
+  // A resumed lesson waits for a click: the first speech always follows a user gesture.
+  const [started, setStarted] = useState(!session.resumed)
+  useEffect(() => { if (!player.paused) setStarted(true) }, [player.paused])
   const pausedForReview = useRef(false)
   const openReview = (key: SegKey) => {
     if (!player.paused && state?.phase === 'teaching') {
@@ -232,6 +237,9 @@ function LessonView({ session }: { session: Session }) {
         ) : null}
         {cpInStage ? (
           <CheckpointArea state={state} dispatch={dispatch} selectedInFigure={tapSel} paramValue={paramValue} onReplaySegment={replaySegment} />
+        ) : null}
+        {!started && player.paused && phase === 'teaching' ? (
+          <button type="button" className="primary resume-lesson" onClick={player.togglePlay}>Resume lesson</button>
         ) : null}
         <div className="player-bar">
           <Controls

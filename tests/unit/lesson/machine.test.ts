@@ -439,3 +439,32 @@ describe('selectors, replay, purity', () => {
     expect(() => replay([])).toThrow()
   })
 })
+
+describe('lesson/resumed', () => {
+  test('streaming segments go pending (content dropped), threads fail, recap pending, overlay cleared, cursor kept', () => {
+    let s = run([
+      start, { type: 'plan/record', record: segPlan(1) }, { type: 'plan/record', record: segPlan(2) }, { type: 'plan/done' },
+      ...fill('seg:1', 2, 'c1'), ...advance(2), { type: 'check/skip', checkId: 'c1' },
+      { type: 'seg/stream', key: 'seg:2' }, { type: 'seg/beat', key: 'seg:2', beat: beat('seg:2', 0) },
+      { type: 'interrupt/ask', threadId: 't1', question: 'q', targets: [] }, { type: 'thread/stream', threadId: 't1' },
+    ])
+    const cursor = s.cursor
+    s = run([{ type: 'lesson/resumed' }], s)
+    expect(s.segments['seg:1']?.status).toBe('complete')
+    expect(s.segments['seg:2']).toMatchObject({ status: 'pending', beats: [] })
+    expect(s.threads[0]?.status).toBe('failed')
+    expect(s.overlay).toBeNull()
+    expect(s.playback).toEqual({ track: 'lesson' })
+    expect(s.cursor).toEqual(cursor)
+    expect(needs(s)).toEqual([{ kind: 'segment', key: 'seg:2' }])
+  })
+
+  test('a streaming recap goes pending', () => {
+    let s = atCheckpoint(1)
+    s = run([{ type: 'check/skip', checkId: 'c1' }], s)
+    expect(s.phase).toBe('recap')
+    s = run([{ type: 'recap/stream' }, { type: 'recap/record', record: { t: 'say', text: 'hi' } as never }, { type: 'lesson/resumed' }], s)
+    expect(s.recap).toMatchObject({ status: 'pending', ideas: [], practice: [] })
+    expect(s.recap?.say).toBeUndefined()
+  })
+})

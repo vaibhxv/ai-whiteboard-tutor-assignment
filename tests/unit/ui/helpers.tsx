@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { clear } from 'idb-keyval'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
@@ -29,7 +30,8 @@ export function recordingWith(responses: Record<string, string>): Recording {
   return { meta: fixture.meta, responses: Object.fromEntries(Object.entries(responses).map(([k, text]) => [k, { text }])) }
 }
 
-export function setup() {
+export async function setup() {
+  await wipeIdb()
   vi.useFakeTimers()
   // Testing Library's async wrapper only advances fake timers it recognises as Jest's.
   vi.stubGlobal('jest', { advanceTimersByTime: (ms: number) => vi.advanceTimersByTime(ms) })
@@ -40,12 +42,17 @@ export function setup() {
   stubFetch({ '/recordings/vertex.json': fixture })
 }
 
-export function teardown() {
+/** Clears IndexedDB without ever hanging a hook (a transaction orphaned by fake timers must not block). */
+const wipeIdb = () => Promise.race([clear().catch(() => {}), new Promise<void>((r) => setTimeout(r, 1500))])
+
+export async function teardown() {
   resetSession()
+  await vi.advanceTimersByTimeAsync(300) // let in-flight IDB work (driven by fake timers) finish
   resetUi()
   try { localStorage.clear() } catch { /* ignore */ }
   vi.unstubAllGlobals()
   vi.useRealTimers()
+  await wipeIdb()
 }
 
 export function renderApp() {

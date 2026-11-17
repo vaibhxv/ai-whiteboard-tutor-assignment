@@ -1,11 +1,13 @@
+import { useEffect } from 'react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { LessonStore } from './lesson/store'
 import { settingsBadge } from './sources/create'
 import type { Badge } from './sources/types'
+import { History } from './ui/History'
 import { Home } from './ui/Home'
 import { LessonScreen } from './ui/LessonScreen'
-import { leaveLesson, useSession } from './ui/session'
+import { leaveLesson, resumeActive, useSession } from './ui/session'
 import { SourceBadge } from './ui/SourceBadge'
 import { useUi } from './ui/store'
 
@@ -36,6 +38,7 @@ function Header() {
       <h1 className="brand">Whyboard</h1>
       <nav className="app-nav" aria-label="Main">
         {screen !== 'home' ? <button type="button" onClick={leaveLesson}>Home</button> : null}
+        {screen !== 'history' ? <button type="button" onClick={() => go('history')}>History</button> : null}
         {screen !== 'settings' ? <button type="button" aria-label="Open settings" onClick={() => go('settings')}>Settings</button> : null}
       </nav>
       <SourceBadge badge={badge} />
@@ -58,13 +61,18 @@ function SettingsScreen() {
 
 export default function App() {
   const screen = useUi((s) => s.screen)
+  // A lesson that was in progress when the page went away comes back (once per page load).
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has('fixture')) return
+    void resumeActive()
+  }, [])
   return (
     <div className="app">
       <Header />
       {screen === 'home' ? <Home /> : null}
       {screen === 'lesson' ? <LessonScreen /> : null}
       {screen === 'settings' ? <SettingsScreen /> : null}
-      {screen === 'history' ? <Home /> : null}
+      {screen === 'history' ? <History /> : null}
     </div>
   )
 }

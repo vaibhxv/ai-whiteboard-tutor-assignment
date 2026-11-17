@@ -51,6 +51,8 @@ export type LessonEvent =
   | { type: 'error'; error: SourceErrorData; retry: RetryTarget }
   | { type: 'error/clear' }
   | { type: 'lesson/done' }
+  /** Appended when a saved lesson is reopened after a refresh: whatever was mid-generation restarts. */
+  | { type: 'lesson/resumed' }
 
 export type LessonEventType = LessonEvent['type']
 export type EventOf<T extends LessonEventType> = Extract<LessonEvent, { type: T }>
