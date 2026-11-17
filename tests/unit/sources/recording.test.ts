@@ -16,7 +16,16 @@ describe('recording', () => {
     const bad = { ...(raw as object), meta: { ...(raw as { meta: object }).meta, via: 'nope' } }
     expect(RecordingSchema.safeParse(bad).success).toBe(false)
   })
-  test('manifest starts empty', () => expect(manifest).toEqual([]))
+  test('manifest lists the three recorded starter lessons, each a valid recording on disk', () => {
+    expect(manifest.map((m) => m.slug)).toEqual(['vertex', 'slope', 'balance'])
+    for (const m of manifest) {
+      expect(m.blurb.length).toBeGreaterThan(10)
+      const rec = RecordingSchema.parse(JSON.parse(readFileSync(`public${m.file}`, 'utf8')))
+      expect(rec.meta.title).toBe(m.title)
+      expect(rec.meta.via).toBe('claude-code')
+      expect(Object.keys(rec.responses)).toEqual(expect.arrayContaining(['plan', 'segment:1', 'recap']))
+    }
+  })
 
   test('has the full branch tree', () => {
     const keys = Object.keys(RecordingSchema.parse(raw).responses)

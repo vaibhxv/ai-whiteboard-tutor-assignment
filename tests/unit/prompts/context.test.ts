@@ -262,6 +262,24 @@ describe('fix round 1: wording', () => {
     expect(SYSTEM_PROMPT).not.toContain('2–4 unlabelled')
   })
 
+  test('every content role says to write maths readably in visible text, and plan/review/repair do not', () => {
+    const { state } = lessonWith(EXAMPLE_SEGMENT)
+    const line = 'In write text, table heads and cells, and labels, write maths readably (x², −, ×, ÷), never code syntax like x^2 or *.'
+    const at = toCheckpoint(state)
+    const msgs = {
+      segment: buildUserMessage('segment', { state, n: 1 }),
+      reteach: buildUserMessage('reteach', { state: at, checkId: 's1c', branch: 'b' }),
+      solution: buildUserMessage('solution', { state: at, checkId: 's1c' }),
+      lost: buildUserMessage('lost', { state, n: 1, style: nextLostStyle(0) }),
+      answer: buildUserMessage('answer', { state, question: 'why?', targets: [] }),
+      recap: buildUserMessage('recap', { state: at }),
+    }
+    for (const [role, msg] of Object.entries(msgs)) {
+      expect(count(block(msg, 'task'), line), role).toBe(1)
+    }
+    expect(buildUserMessage('plan', { topic: 'x' })).not.toContain('readably')
+  })
+
   test('answer "differently" never asks for a new plot (answer mode has none)', () => {
     const { state } = lessonWith(EXAMPLE_SEGMENT)
     const task = block(buildUserMessage('answer', { state, question: 'q', targets: [], followUp: 'differently' }), 'task')

@@ -45,6 +45,10 @@ const STYLE_HINT: Record<string, string> = {
   'smaller steps': 'one tiny step per beat, each a step line with "from" and a plain "why"',
 }
 
+/** One line shared by every board/recap task: readable maths in visible text (code syntax belongs only in expr fields). */
+export const READABLE_MATHS =
+  'In write text, table heads and cells, and labels, write maths readably (x², −, ×, ÷), never code syntax like x^2 or *.'
+
 const out = (mode: string, role: Role) =>
   `Output JSON Lines only, in ${mode} mode. Cap: about ${ROLE_CAPS[role]} tokens, so be economical.`
 
@@ -92,6 +96,7 @@ export function segmentTask(a: SegmentTaskArgs): string {
     'Write 4–9 beats in board mode (any action type); every say starts a beat, so use at most 9 says. One small step per beat. Draw your own figures; don\'t point at earlier pages.',
     'Even in a graph segment, state any formula or equation you rely on as a `math` line with `expr`, and write derivations as `step` lines with `from` and `expr`.',
     `Finish with: your last say (leading into the check without repeating its question), then 1–2 ask lines (questions this learner would really want to ask here), then exactly one check of kind "${p.check}" with explain and hint as the very last line. The check tests this segment's goal, and the misconception above is one of its wrong answers.`,
+    READABLE_MATHS,
     idsLine(a.prefix, a.used),
     out('board', 'segment'),
   ].join('\n')
@@ -112,6 +117,7 @@ export function reteachTask(a: {
     `Use a different representation from the segment's "${a.representation}": try ${REP_ALT[a.representation]}. Don't repeat the segment's wording or picture.`,
     'Do not reveal the answer: no say, line or mark may state the correct answer or point to the correct option. End with a say inviting them to try the checkpoint again.',
     '2–4 beats in board mode. No check and no ask lines.',
+    READABLE_MATHS,
     idsLine(a.prefix, a.used),
     out('board', 'reteach'),
   ].join('\n')
@@ -126,6 +132,7 @@ export function solutionTask(a: { n: number; check: CheckSummary; misconceptions
     a.misconceptions.length ? `Misconceptions seen: ${a.misconceptions.join('; ')}` : '',
     'Work it step by step: set the problem up with a math line (with expr), derive each next line as a step with "from" and a short "why", then state the answer plainly (solutions for a solution set). Name their slip once, kindly. End with a say that this idea will come back in practice.',
     '3–6 beats in board mode. No check and no ask lines.',
+    READABLE_MATHS,
     idsLine(a.prefix, a.used),
     out('board', 'solution'),
   ].filter(Boolean).join('\n')
@@ -139,6 +146,7 @@ export function lostTask(a: { plan: SegmentPlan | undefined; n: number; style: s
     `Re-explain the same idea using ${a.style}${hint ? `: ${hint}` : ''}.`,
     'Start from something they surely know, go in smaller steps, and add nothing beyond the segment\'s goal. Don\'t repeat the segment\'s wording. End with a say handing back to the lesson.',
     '2–5 beats in board mode. No check and no ask lines.',
+    READABLE_MATHS,
     idsLine(a.prefix, a.used),
     out('board', 'lost'),
   ].join('\n')
@@ -160,6 +168,7 @@ export function answerTask(a: {
     'Answer in at most 6 beats. Allowed actions: say, write, math, step, mark, point, line, guide (answer mode: no plot, table, numberline, explore, check or ask). You may mark existing ids listed in <board>, and add points, lines or guides to plots listed there.',
     'Answer that question only, using what is on the board. If they want the bare answer to a checkpoint, give the next step and a question back. If the question is off-topic or unsafe, steer kindly back to the maths in one beat.',
     'End with a say that checks understanding.',
+    READABLE_MATHS,
     idsLine(a.prefix, a.used),
     out('answer', 'answer'),
   ].filter(Boolean).join('\n')
@@ -176,6 +185,7 @@ export function recapTask(a: { outcomes: string[]; warmup: string; weak: string[
     '1. 3–5 idea lines (ids i1, i2, …): one key idea each, in plain words, with "seg" = the number of the segment that taught it.',
     '2. One say revisiting the warm-up (one sentence, at most 22 words): remind them of their guess and ask what they think now (or, if they skipped it, ask it again briefly).',
     `3. Exactly 3 practice checks with ids rp1, rp2, rp3: kinds choice, number or expr only (no figures), each with "idea" = one of your idea ids, explain and hint. Fresh numbers, not the lesson's examples, and no help inside the prompt.${a.weak.length ? ` Weight them toward what was missed or skipped (${a.weak.join('; ')}): at least two of the three.` : ' Cover different ideas.'}`,
+    READABLE_MATHS,
   ].join('\n')
 }
 
