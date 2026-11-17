@@ -114,3 +114,58 @@ test('Test gives up after 15 s with the offline copy', async () => {
   await act(async () => { await vi.advanceTimersByTimeAsync(15_100) })
   expect(screen.getByText(/Can't reach the internet/)).toBeInTheDocument()
 })
+
+function stubBridgeStatus(body: unknown) {
+  const f = vi.fn(async (url: string) => {
+    if (url === '/bridge/status') return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+    return new Response('not found', { status: 404 })
+  })
+  vi.stubGlobal('fetch', f)
+  return f
+}
+
+test('local build: subscription options show the real bridge status and next steps', async () => {
+  vi.stubGlobal('__LOCAL__', true)
+  const f = stubBridgeStatus({
+    claude: { installed: true, version: '2.1.326', signedIn: true, plan: 'max' },
+    codex: { installed: false },
+  })
+  const { user } = await open()
+  expect(await screen.findByText('Ready · max plan · Claude Code 2.1.326')).toBeInTheDocument()
+  expect(screen.getByText('Not installed. Install Codex, then run "codex" once to sign in.')).toBeInTheDocument()
+  expect(screen.queryByText(/Only available when you run Whyboard/)).toBeNull()
+  expect(f).toHaveBeenCalledWith('/bridge/status', expect.anything())
+  const radio = screen.getByRole('radio', { name: 'Claude Code subscription (this computer)' })
+  expect(radio).toBeEnabled()
+  await user.click(radio)
+  expect(useUi.getState().settings.sourceId).toBe('claude-code')
+  expect(screen.getByTestId('source-badge')).toHaveTextContent('LIVE · Claude Code on this computer')
+})
+
+test('local build: signed out shows the sign-in step, and Check again re-reads the status', async () => {
+  vi.stubGlobal('__LOCAL__', true)
+  stubBridgeStatus({ claude: { installed: true, version: '2.1.326', signedIn: false }, codex: { installed: true, version: '0.99.0', signedIn: false } })
+  const { user } = await open()
+  expect(await screen.findByText('Signed out. Run "claude" in a terminal and sign in.')).toBeInTheDocument()
+  expect(screen.getByText('Signed out. Run "codex" in a terminal and sign in.')).toBeInTheDocument()
+  const f = stubBridgeStatus({ claude: { installed: true, version: '2.1.326', signedIn: true, plan: 'pro' }, codex: { installed: false } })
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+  expect(await screen.findByText('Ready · pro plan · Claude Code 2.1.326')).toBeInTheDocument()
+  expect(f).toHaveBeenCalled()
+})
+
+test('local build: an unreachable bridge says how to start it', async () => {
+  vi.stubGlobal('__LOCAL__', true)
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+  await open()
+  expect((await screen.findAllByText(/Can't reach the local bridge/)).length).toBe(2)
+})
+
+test('choosing a subscription clears a model left over from an API key', async () => {
+  vi.stubGlobal('__LOCAL__', true)
+  stubBridgeStatus({ claude: { installed: true, signedIn: true }, codex: { installed: false } })
+  const { user } = await open()
+  act(() => { useUi.getState().updateSettings({ sourceId: 'anthropic', provider: 'anthropic', model: 'claude-opus-5-5' }) })
+  await user.click(screen.getByRole('radio', { name: 'Claude Code subscription (this computer)' }))
+  expect(useUi.getState().settings.model).toBeUndefined()
+})

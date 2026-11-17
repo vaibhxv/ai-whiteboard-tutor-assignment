@@ -84,3 +84,7 @@ export function liveCliBadge(cli: 'claude' | 'codex'): Badge {
   const name = cli === 'claude' ? 'Claude Code' : 'Codex'
   return { mode: 'live', text: `LIVE · ${name} on this computer`, model: cli, billedTo: 'subscription' }
 }
+
+/** One CLI as the local bridge reports it (no account details: email and organisation never leave the bridge). */
+export type CliStatus = { installed: boolean; version?: string; signedIn?: boolean; plan?: string }
+export type BridgeStatus = { claude: CliStatus; codex: CliStatus }

@@ -1,6 +1,6 @@
 /**
- * Builds the AI source the settings choose. This task wires only `replay`; Tasks 18 and 19 add the
- * API-key and subscription sources (until then they return null and the UI says they are not set up).
+ * Builds the AI source the settings choose: a recording, an API key straight to a provider, or (only when
+ * Whyboard runs on the user's own computer) the user's Claude Code / Codex CLI through the local bridge.
  */
 import type { ProviderId, Settings } from '../storage/settings'
 import type { Recording } from './recording'
@@ -10,7 +10,7 @@ import { PROVIDERS } from './providers'
 import { createReplaySource } from './replay'
 import type { ReplayOpts } from './replay'
 import { liveApiBadge, liveCliBadge } from './types'
-import type { AiSource, Badge, ProviderLabel } from './types'
+import type { AiSource, Badge, GenEvent, GenRequest, ProviderLabel } from './types'
 
 /** The part of Task 18's key store this module needs. */
 export interface KeyLookup {
@@ -35,8 +35,24 @@ export function createActiveSource(settings: Settings, keyStore: KeyLookup, opts
       const key = keyStore.get(provider)
       return key ? createOpenAICompatibleSource({ provider, key, model: settings.model ?? DEFAULT_MODELS[provider] }) : null
     }
-    default:
-      return null // Task 19 (subscriptions)
+    case 'claude-code':
+    case 'codex':
+      // Compile-time false in the public build, so the bridge client is not even bundled there.
+      if (__LOCAL__) return lazyBridgeSource(settings.sourceId === 'codex' ? 'codex' : 'claude', settings.model)
+      return null
+  }
+}
+
+/** A bridge source whose code loads on first use (keeps `createActiveSource` synchronous). */
+function lazyBridgeSource(cli: 'claude' | 'codex', model: string | undefined): AiSource {
+  const load = () => import('./bridge-client').then((m) => m.createBridgeSource({ cli, ...(model ? { model } : {}) }))
+  return {
+    id: cli === 'claude' ? 'claude-code' : 'codex',
+    badge: () => liveCliBadge(cli),
+    preflight: async () => (await load()).preflight(),
+    async *generate(req: GenRequest, signal: AbortSignal): AsyncGenerator<GenEvent> {
+      yield* (await load()).generate(req, signal)
+    },
   }
 }
 

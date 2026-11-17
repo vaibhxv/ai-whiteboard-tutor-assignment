@@ -10,10 +10,10 @@
  * and prints a summary per call. Raw outputs are written to outDir (default: a fresh temp dir).
  * With --extended it also runs reteach (a wrong answer at the segment 1 checkpoint) and recap.
  */
-import { spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { runCli } from '../bridge/spawn'
 import type { Action, PlanRecord } from '../src/actions'
 import type { LessonEvent } from '../src/lesson/events'
 import { reduce } from '../src/lesson/machine'
@@ -34,77 +34,38 @@ const CALL_TIMEOUT_MS = 240_000
 
 type CallResult = { text: string; raw: string; stop: StopReason; ttfMs: number | null; totalMs: number; usage?: unknown; stderr: string }
 
-const ENV_ALLOW = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM', 'CLAUDE_CONFIG_DIR']
-
-/** Child env from an allowlist only (no API keys or parent-session variables can leak in). */
-function claudeEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {}
-  for (const k of ENV_ALLOW) if (process.env[k] !== undefined) env[k] = process.env[k]
-  env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = '1'
-  return env
-}
-
-/** Spawn `claude -p` (argument array, no shell), prompt on stdin, streaming text deltas to `onText`. */
-function runClaude(user: string, onText: (t: string) => void): Promise<CallResult> {
-  const args = [
-    '-p', '--model', 'sonnet', '--tools', '', '--system-prompt', SYSTEM_PROMPT,
-    '--safe-mode', '--setting-sources', '', '--strict-mcp-config', '--disallowedTools', 'mcp__*',
-    '--disable-slash-commands', '--no-session-persistence', '--permission-prompts', 'none',
-    '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-  ]
-  const cwd = mkdtempSync(join(tmpdir(), 'whyboard-smoke-'))
+/**
+ * One `claude -p` call through the bridge's runner (bridge/spawn.ts → bridge/claude.ts `claudeArgs`):
+ * argument array, prompt on stdin, allowlisted env, fresh temp cwd removed afterwards.
+ */
+async function runClaude(user: string, onText: (t: string) => void): Promise<CallResult> {
   const t0 = Date.now()
-  return new Promise((done, fail) => {
-    const child = spawn('claude', args, { cwd, env: claudeEnv(), stdio: ['pipe', 'pipe', 'pipe'] })
-    let buf = ''
-    let raw = ''
-    let text = ''
-    let stderr = ''
-    let ttfMs: number | null = null
-    let usage: unknown
-    let stopReason: string | undefined
-    const timer = setTimeout(() => child.kill('SIGTERM'), CALL_TIMEOUT_MS)
-    const handle = (line: string) => {
-      if (!line.trim()) return
-      let ev: Record<string, unknown>
-      try {
-        ev = JSON.parse(line) as Record<string, unknown>
-      } catch {
-        return
-      }
-      if (ev.type === 'stream_event') {
-        const e = ev.event as { type?: string; delta?: { type?: string; text?: string; stop_reason?: string } } | undefined
-        if (e?.delta?.type === 'text_delta' && typeof e.delta.text === 'string') {
-          if (ttfMs === null) ttfMs = Date.now() - t0
-          text += e.delta.text
-          onText(e.delta.text)
-        }
-        if (e?.type === 'message_delta' && e.delta?.stop_reason) stopReason = e.delta.stop_reason
-      } else if (ev.type === 'result') {
-        usage = ev.usage
-      }
+  let raw = ''
+  let text = ''
+  let stderr = ''
+  let ttfMs: number | null = null
+  let usage: unknown
+  let stop: StopReason = 'aborted'
+  const onLine = (line: string) => {
+    raw += line + '\n'
+    try {
+      const o = JSON.parse(line) as { type?: string; usage?: unknown }
+      if (o.type === 'result') usage = o.usage // raw usage keeps the thinking-token split
+    } catch { /* not JSON */ }
+  }
+  for await (const e of runCli('claude', { system: SYSTEM_PROMPT, user, model: 'sonnet' }, new AbortController().signal, { timeoutMs: CALL_TIMEOUT_MS, onLine })) {
+    if (e.type === 'text') {
+      if (ttfMs === null) ttfMs = Date.now() - t0
+      text += e.text
+      onText(e.text)
+    } else if (e.type === 'done') {
+      stop = e.stop
+    } else if (e.type === 'error') {
+      stop = 'aborted'
+      stderr = `${e.kind}: ${e.detail ?? ''}`
     }
-    child.stdout.setEncoding('utf8')
-    child.stdout.on('data', (d: string) => {
-      raw += d
-      buf += d
-      const parts = buf.split('\n')
-      buf = parts.pop() ?? ''
-      parts.forEach(handle)
-    })
-    child.stderr.setEncoding('utf8')
-    child.stderr.on('data', (d: string) => { stderr += d })
-    const cleanup = () => rmSync(cwd, { recursive: true, force: true })
-    child.on('error', (err) => { clearTimeout(timer); cleanup(); fail(err) })
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      cleanup()
-      handle(buf)
-      const stop: StopReason = code !== 0 ? 'aborted' : stopReason === 'max_tokens' ? 'length' : 'end'
-      done({ text, raw, stop, ttfMs, totalMs: Date.now() - t0, usage, stderr })
-    })
-    child.stdin.end(user)
-  })
+  }
+  return { text, raw, stop, ttfMs, totalMs: Date.now() - t0, usage, stderr }
 }
 
 type Summary = Record<string, unknown>

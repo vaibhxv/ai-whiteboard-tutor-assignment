@@ -1,9 +1,10 @@
-import { useId, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { errorCopy } from '../sources/errors'
 import type { ErrorKind } from '../sources/errors'
 import { compatProvider, createActiveSource } from '../sources/create'
 import { keyStore } from '../sources/key-store'
 import { PROVIDERS } from '../sources/providers'
+import type { BridgeStatus } from '../sources/types'
 import type { ProviderId, SourceId } from '../storage/settings'
 import { useSession } from './session'
 import { useUi } from './store'
@@ -14,6 +15,10 @@ const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[]
 
 type Group = 'replay' | 'key' | 'claude-code' | 'codex'
 const groupOf = (s: SourceId): Group => (s === 'anthropic' || s === 'openai-compatible' ? 'key' : s)
+
+type CliLine = { ok: boolean; text: string }
+/** The local bridge's view of both CLIs, as the lines shown under each subscription option. */
+type CliCheck = { state: 'checking' } | { state: 'done'; lines: Record<'claude-code' | 'codex', CliLine> }
 
 type TestState = { status: 'idle' } | { status: 'testing' } | { status: 'paste' } | { status: 'ok' } | { status: 'fail'; kind: ErrorKind }
 
@@ -29,10 +34,38 @@ export function Settings() {
   const [key, setKey] = useState(() => keyStore.get(provider) ?? '')
   const [test, setTest] = useState<TestState>({ status: 'idle' })
   const local = __LOCAL__
+  const [cli, setCli] = useState<CliCheck>({ state: 'checking' })
+  const checkSeq = useRef(0)
+
+  /** Reads `/bridge/status` (local runs only; the bridge client is never in the public bundle). */
+  const checkClis = useCallback(() => {
+    if (!__LOCAL__) return
+    const mine = ++checkSeq.current
+    setCli({ state: 'checking' })
+    void import('../sources/bridge-client').then(async (m) => {
+      let lines: Record<'claude-code' | 'codex', CliLine>
+      try {
+        const s: BridgeStatus = await m.getBridgeStatus(AbortSignal.timeout(20_000))
+        lines = { 'claude-code': m.statusLine('claude', s.claude), codex: m.statusLine('codex', s.codex) }
+      } catch {
+        const down = { ok: false, text: m.BRIDGE_DOWN }
+        lines = { 'claude-code': down, codex: down }
+      }
+      if (mine === checkSeq.current) setCli({ state: 'done', lines })
+    }, () => {
+      const down = { ok: false, text: "Couldn't check this computer's command-line apps. Reload the page." }
+      if (mine === checkSeq.current) setCli({ state: 'done', lines: { 'claude-code': down, codex: down } })
+    })
+  }, [])
+  useEffect(() => {
+    checkClis()
+    return () => { checkSeq.current++ } // a late answer after unmount is ignored
+  }, [checkClis])
 
   const chooseGroup = (g: Group) => {
     if (g === 'key') pickProvider(settings.provider ?? 'gemini')
-    else update({ sourceId: g })
+    else if (g === 'replay') update({ sourceId: g })
+    else update({ sourceId: g, model: undefined }) // a model left over from an API key means nothing to a CLI
     setTest({ status: 'idle' })
   }
   const pickProvider = (p: ProviderId) => {
@@ -81,7 +114,11 @@ export function Settings() {
       </label>
       <p id={`${base}-${g}-note`} className="helper">
         {local ? (
-          <span role="status">Checking…</span>
+          <span role="status">
+            {cli.state === 'checking' ? 'Checking…' : (
+              <><span aria-hidden="true">{cli.lines[g].ok ? '✓ ' : '✗ '}</span>{cli.lines[g].text}</>
+            )}
+          </span>
         ) : (
           <>{PUBLIC_ONLY_COPY}{' '}<a href={RUN_LOCALLY_URL} target="_blank" rel="noopener noreferrer">How to run it locally</a></>
         )}
@@ -110,6 +147,9 @@ export function Settings() {
         </div>
         {subscription('claude-code', 'Claude Code subscription (this computer)')}
         {subscription('codex', 'Codex subscription (this computer)')}
+        {local ? (
+          <button type="button" onClick={checkClis} disabled={cli.state === 'checking'}>Check again</button>
+        ) : null}
       </fieldset>
 
       {group === 'key' ? (
