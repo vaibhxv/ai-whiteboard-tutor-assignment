@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { History as HistoryIcon, House, Settings as SettingsIcon } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { LessonStore } from './lesson/store'
@@ -36,13 +37,29 @@ function Header() {
   return (
     <header className="app-header">
       <a className="skip-link" href="#main">Skip to content</a>
-      <h1 className="brand">Whyboard</h1>
-      <nav className="app-nav" aria-label="Main">
-        {screen !== 'home' ? <button type="button" onClick={leaveLesson}>Home</button> : null}
-        {screen !== 'history' ? <button type="button" onClick={() => go('history')}>History</button> : null}
-        {screen !== 'settings' ? <button type="button" aria-label="Open settings" onClick={() => go('settings')}>Settings</button> : null}
-      </nav>
+      <div className="brand-wrap">
+        <span className="brand-logo" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M4 18c3-9 6-12 8-12s5 3 8 12" />
+          </svg>
+        </span>
+        <h1 className="brand">Whyboard</h1>
+      </div>
+      <div className="header-spacer" />
       <SourceBadge badge={badge} />
+      <nav className="app-nav" aria-label="Main">
+        {screen !== 'home' ? (
+          <button type="button" className="nav-btn" onClick={leaveLesson}><House size={18} aria-hidden="true" /><span className="nav-text">Home</span></button>
+        ) : null}
+        {screen !== 'history' ? (
+          <button type="button" className="nav-btn" onClick={() => go('history')}><HistoryIcon size={18} aria-hidden="true" /><span className="nav-text">History</span></button>
+        ) : null}
+        {screen !== 'settings' ? (
+          <button type="button" className="nav-btn" aria-label="Open settings" onClick={() => go('settings')}>
+            <SettingsIcon size={18} aria-hidden="true" /><span className="nav-text">Settings</span>
+          </button>
+        ) : null}
+      </nav>
     </header>
   )
 }

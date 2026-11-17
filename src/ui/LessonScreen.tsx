@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useStore } from 'zustand'
+import { Captions as CaptionsIcon } from 'lucide-react'
 import { Board } from '../board/Board'
 import { startValues } from '../board/elements/Explore'
 import type { ParamValues } from '../board/elements/Explore'
@@ -49,8 +50,8 @@ function useViewport(ref: RefObject<HTMLElement | null>): Viewport {
   return vp
 }
 
-/** Room kept under the board on wide screens: captions (two lines), controls, disclosure and gaps. */
-const BELOW_BOARD = 200
+/** Room kept under the board on wide screens: captions bar (two lines), toolbar, disclosure and gaps. */
+const BELOW_BOARD = 236
 
 /**
  * Side-by-side layout (≥ 1024 px): the board's rendered height is capped so the board, captions and
@@ -78,7 +79,7 @@ export function LessonScreen() {
     return (
       <main className="lesson-empty" id="main">
         <p>No lesson in progress.</p>
-        <button type="button" onClick={leaveLesson}>Go home</button>
+        <button type="button" className="primary" onClick={leaveLesson}>Go home</button>
       </main>
     )
   }
@@ -172,7 +173,7 @@ function LessonView({ session }: { session: Session }) {
     }
   }
 
-  if (!state) return <main className="lesson" id="main"><p className="helper">Starting…</p></main>
+  if (!state) return <main className="lesson" id="main"><div className="lesson-body"><p className="helper">Starting…</p></div></main>
 
   const phase = state.phase
   const check = activeCheck(state)
@@ -222,13 +223,15 @@ function LessonView({ session }: { session: Session }) {
   } else {
     stage = (
       <>
-        <Board
-          pages={player.pages} pageIndex={player.pageIndex} visibleBeats={player.visibleBeats} animating={player.animating}
-          playToken={player.playToken} paused={player.paused} speed={player.speed} selected={selected} onSelect={ui.select}
-          onAskAbout={onAskAbout} onReport={onReport} index={index} viewport={viewport} params={params} onParamChange={onParamChange}
-          maxHeight={maxHeight} struck={struck} answer={answer}
-        />
-        <Captions say={player.currentSay} enabled={captions} />
+        <div className="board-card">
+          <Board
+            pages={player.pages} pageIndex={player.pageIndex} visibleBeats={player.visibleBeats} animating={player.animating}
+            playToken={player.playToken} paused={player.paused} speed={player.speed} selected={selected} onSelect={ui.select}
+            onAskAbout={onAskAbout} onReport={onReport} index={index} viewport={viewport} params={params} onParamChange={onParamChange}
+            maxHeight={maxHeight} struck={struck} answer={answer}
+          />
+          <Captions say={player.currentSay} enabled={captions} />
+        </div>
         {cpInStage ? (
           <InterruptPanel
             state={state} controller={controller} dispatch={dispatch} index={index} replay={replayMode}
@@ -247,10 +250,11 @@ function LessonView({ session }: { session: Session }) {
             onTogglePlay={player.togglePlay} onBack={player.back} onForward={player.forward} onReplay={player.replay}
             onSpeed={(s) => { player.setSpeed(s); ui.setSpeed(s) }} onToggleMute={player.toggleMute}
             interrupted={!!interrupted}
-          />
-          <label className="captions-toggle">
-            <input type="checkbox" checked={captions} onChange={(e) => ui.setCaptions(e.target.checked)} /> Captions
-          </label>
+          >
+            <button type="button" className="tool-btn captions-toggle" aria-pressed={captions} onClick={() => ui.setCaptions(!captions)}>
+              <CaptionsIcon size={18} aria-hidden="true" /><span className="tool-text">Captions</span>
+            </button>
+          </Controls>
         </div>
       </>
     )
@@ -258,9 +262,17 @@ function LessonView({ session }: { session: Session }) {
 
   return (
     <main className="lesson" id="main">
-      <h2 className="lesson-topic">{state.topic}</h2>
+      <div className="lesson-strip">
+        <div className="lesson-strip-inner">
+          <div className="lesson-title">
+            <span className="eyebrow-plain" aria-hidden="true">Lesson</span>
+            <h2 className="lesson-topic">{state.topic}</h2>
+          </div>
+          <ProgressRail state={state} reviewing={reviewing} onReview={openReview} />
+        </div>
+      </div>
+      <div className="lesson-body">
       {state.scope?.verdict === 'adjacent' ? <BestEffortBanner /> : null}
-      <ProgressRail state={state} reviewing={reviewing} onReview={openReview} />
       <div className="lesson-grid">
         <div className="stage" ref={stageRef}>
           {thinking ? <ThinkingIndicator onCancel={() => controller.cancel()} /> : null}
@@ -272,6 +284,7 @@ function LessonView({ session }: { session: Session }) {
           onReplaySegment={replaySegment} checkpointInStage={cpInStage} transcript={transcript} index={index}
           controller={controller} replay={replayMode} onRaiseHand={onRaiseHand} interruptInStage={cpInStage}
         />
+      </div>
       </div>
       {problem ? (
         <ProblemOverlay

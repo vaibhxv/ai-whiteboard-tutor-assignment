@@ -28,7 +28,9 @@ export function ReviewView({ title, pages, index, viewport, maxHeight, onBack }:
         <button type="button" onClick={onBack}>Back to lesson</button>
       </div>
       {pages.length > 0 ? (
-        <Board pages={pages} pageIndex={i} visibleBeats={visible} speed={1} index={index} viewport={viewport} maxHeight={maxHeight} onSelect={noop} />
+        <div className="board-card">
+          <Board pages={pages} pageIndex={i} visibleBeats={visible} speed={1} index={index} viewport={viewport} maxHeight={maxHeight} onSelect={noop} />
+        </div>
       ) : (
         <p className="helper">Nothing was drawn in this part.</p>
       )}

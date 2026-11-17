@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CircleCheck, CircleX, TriangleAlert } from 'lucide-react'
 import type { CheckAction } from '../actions'
 import type { CheckGrade } from '../lesson/events'
 import type { CheckRecord } from '../lesson/types'
@@ -27,6 +28,13 @@ export type CheckpointProps = {
 
 export const FIRST_WRONG = "Not quite. Let's look at it another way."
 export const SECOND_WRONG = "Let's work through it together."
+
+/** Feedback copy with its first sentence as the bold lead word ("Not quite.") and the rest after it. */
+export function FeedbackText({ text }: { text: string }) {
+  const cut = text.indexOf('. ')
+  if (cut < 0) return <span className="fb-text"><strong>{text}</strong></span>
+  return <span className="fb-text"><strong>{text.slice(0, cut + 1)}</strong> {text.slice(cut + 2)}</span>
+}
 
 export function Checkpoint(p: CheckpointProps) {
   const { check, record } = p
@@ -87,16 +95,18 @@ export function Checkpoint(p: CheckpointProps) {
 
   const attempts = Math.max(record?.attempts ?? 0, wrongs)
   let feedback: React.ReactNode = null
-  if (invalid) feedback = <><span aria-hidden="true">⚠ </span>{invalid}</>
+  if (invalid) feedback = <><TriangleAlert className="fb-icon" size={20} aria-hidden="true" /><span className="fb-text">{invalid}</span></>
   else if (grade && !done) {
-    if (rate) feedback = check.explain
-    else if (grade.result === 'correct') feedback = <><span aria-hidden="true">✓ </span>Correct — {check.explain}</>
-    else feedback = <><span aria-hidden="true">✗ </span>{attempts >= 2 ? SECOND_WRONG : FIRST_WRONG}</>
+    if (rate) feedback = <span className="fb-text">{check.explain}</span>
+    else if (grade.result === 'correct') {
+      feedback = <><CircleCheck className="fb-icon" size={20} aria-hidden="true" /><span className="fb-text"><strong>Correct</strong> — {check.explain}</span></>
+    } else feedback = <><CircleX className="fb-icon" size={20} aria-hidden="true" /><FeedbackText text={attempts >= 2 ? SECOND_WRONG : FIRST_WRONG} /></>
   }
 
   const inputsOff = answered || done
   return (
     <section className="checkpoint" aria-label="Checkpoint">
+      <span className="pill-turn" aria-hidden="true">Your turn</span>
       <p className="cp-prompt">{check.prompt}</p>
       {rate ? (
         <Rate check={check as Extract<CheckAction, { kind: 'choice' }>} disabled={!!grade}
@@ -123,15 +133,17 @@ export function Checkpoint(p: CheckpointProps) {
         <p className="cp-empty" id={`${check.id}-empty`}>Type your answer first</p>
       ) : null}
       <div className="cp-actions">
-        {!rate ? <button type="button" onClick={doSubmit} disabled={submitDisabled}>Check</button> : null}
+        {!rate ? <button type="button" className="primary" onClick={doSubmit} disabled={submitDisabled}>Check</button> : null}
         {(answered || (rate && grade)) && !done ? (
-          <button type="button" onClick={() => { setDone(true); p.onContinue() }}>Continue</button>
+          <button type="button" className="primary" onClick={() => { setDone(true); p.onContinue() }}>Continue</button>
         ) : null}
         {!rate ? (
           <button type="button" onClick={() => { setHint(true); p.onUnsure() }}>I'm not sure</button>
         ) : null}
-        <button type="button" onClick={p.onReplaySegment}>Replay this part</button>
-        <button type="button" onClick={p.onSkip}>Skip</button>
+      </div>
+      <div className="cp-sub-actions">
+        <button type="button" className="text-btn" onClick={p.onReplaySegment}>Replay this part</button>
+        <button type="button" className="text-btn subtle" onClick={p.onSkip}>Skip</button>
       </div>
     </section>
   )

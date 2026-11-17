@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Check, RotateCcw, X } from 'lucide-react'
 import { errorCopy } from '../sources/errors'
 import type { ErrorKind } from '../sources/errors'
 import { compatProvider, createActiveSource } from '../sources/create'
@@ -112,11 +113,13 @@ export function Settings() {
         />{' '}
         {label}
       </label>
-      <p id={`${base}-${g}-note`} className="helper">
+      <p id={`${base}-${g}-note`} className="helper source-desc">
         {local ? (
-          <span role="status">
+          <span role="status" className={`cli-line${cli.state === 'done' ? (cli.lines[g].ok ? ' is-ok' : ' is-off') : ''}`}>
             {cli.state === 'checking' ? 'Checking…' : (
-              <><span aria-hidden="true">{cli.lines[g].ok ? '✓ ' : '✗ '}</span>{cli.lines[g].text}</>
+              <>{cli.lines[g].ok
+                ? <Check size={16} strokeWidth={2.5} aria-hidden="true" />
+                : <X size={16} strokeWidth={2.5} aria-hidden="true" />}{cli.lines[g].text}</>
             )}
           </span>
         ) : (
@@ -133,22 +136,35 @@ export function Settings() {
 
       <fieldset className="source-choice">
         <legend>Where the lessons come from</legend>
+        <p className="helper source-lead">Applies to your next lesson.</p>
         <div className="source-option">
           <label>
-            <input type="radio" name={`${base}-source`} checked={group === 'replay'} onChange={() => chooseGroup('replay')} />{' '}
+            <input
+              type="radio" name={`${base}-source`} checked={group === 'replay'} aria-describedby={`${base}-replay-note`}
+              onChange={() => chooseGroup('replay')}
+            />{' '}
             Recorded lessons
           </label>
+          <p id={`${base}-replay-note`} className="helper source-desc">Real model output, replayed. Works with no setup.</p>
         </div>
         <div className="source-option">
           <label>
-            <input type="radio" name={`${base}-source`} checked={group === 'key'} onChange={() => chooseGroup('key')} />{' '}
+            <input
+              type="radio" name={`${base}-source`} checked={group === 'key'} aria-describedby={`${base}-key-note`}
+              onChange={() => chooseGroup('key')}
+            />{' '}
             My API key
           </label>
+          <p id={`${base}-key-note`} className="helper source-desc">
+            Anthropic, OpenAI, Google Gemini, OpenRouter or Groq. Sent straight from your browser to that provider.
+          </p>
         </div>
         {subscription('claude-code', 'Claude Code subscription (this computer)')}
         {subscription('codex', 'Codex subscription (this computer)')}
         {local ? (
-          <button type="button" onClick={checkClis} disabled={cli.state === 'checking'}>Check again</button>
+          <button type="button" className="check-again" onClick={checkClis} disabled={cli.state === 'checking'}>
+            <RotateCcw size={16} aria-hidden="true" />Check again
+          </button>
         ) : null}
       </fieldset>
 
@@ -177,16 +193,16 @@ export function Settings() {
             <p className="helper">Otherwise your key is held in memory only and is gone when you refresh.</p>
           </div>
           <div className="field key-actions">
-            <button type="button" onClick={() => void runTest()} disabled={test.status === 'testing'}>Test</button>{' '}
+            <button type="button" className="primary" onClick={() => void runTest()} disabled={test.status === 'testing'}>Test</button>{' '}
             <button type="button" onClick={forget}>Forget key</button>{' '}
             <a href={info.keyUrl} target="_blank" rel="noopener noreferrer">Get a key</a>
           </div>
           <div role="status" aria-live="polite" className="test-result">
             {test.status === 'testing' ? 'Testing…' : null}
             {test.status === 'paste' ? 'Paste a key first.' : null}
-            {test.status === 'ok' ? <span><span aria-hidden="true">✓ </span>Works</span> : null}
+            {test.status === 'ok' ? <span className="test-ok"><Check size={16} strokeWidth={2.5} aria-hidden="true" />Works</span> : null}
             {test.status === 'fail' ? (
-              <span><span aria-hidden="true">✗ </span>{errorCopy(test.kind).title}. {errorCopy(test.kind).body}</span>
+              <span className="test-fail"><X size={16} strokeWidth={2.5} aria-hidden="true" />{errorCopy(test.kind).title}. {errorCopy(test.kind).body}</span>
             ) : null}
           </div>
           <details className="advanced">

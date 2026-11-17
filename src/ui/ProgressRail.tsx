@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import type { LessonState, SegKey } from '../lesson/types'
 import { railItems } from './lesson-view'
 
@@ -17,13 +18,13 @@ export function ProgressRail({ state, reviewing, onReview }: { state: LessonStat
           <li key={it.key} className={`rail-item is-${it.status}${it.extra ? ' is-extra' : ''}`} aria-current={it.status === 'current' ? 'step' : undefined}>
             {it.status === 'done' && it.key !== 'recap' ? (
               <button type="button" aria-pressed={reviewing === it.key} onClick={() => onReview(it.key as SegKey)}>
-                <span className="rail-mark" aria-hidden="true">✓</span>
+                <span className="rail-mark" aria-hidden="true"><Check size={12} strokeWidth={3} /></span>
                 <span className="rail-label">{it.label}</span>
                 <span className="visually-hidden"> (done, review)</span>
               </button>
             ) : (
               <span className="rail-static">
-                <span className="rail-mark" aria-hidden="true">{it.status === 'current' ? '●' : marks[i]}</span>
+                <span className="rail-mark" aria-hidden="true">{marks[i]}</span>
                 <span className="rail-label">{it.label}</span>
                 {it.status === 'future' ? <span className="visually-hidden"> (coming up)</span> : null}
               </span>

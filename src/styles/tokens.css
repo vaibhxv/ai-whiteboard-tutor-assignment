@@ -1,34 +1,120 @@
+/* Design tokens. Board styles (board.css) read --ink, --ink-answer, --board-bg, --accent, --ok, --warn, --danger, --focus. */
 :root {
   color-scheme: light dark;
-  --ink: #1f2430;
-  --ink-answer: #1d4ed8;
-  --board-bg: #fbfaf6;
-  --accent: #5b3fd6;
-  --ok: #17692f;
-  --warn: #8a5300;
-  --danger: #b3261e;
-  --focus: #1a56db;
-  --page-bg: #f1efe8;
+
+  /* Surfaces */
+  --page-bg: #f4f5f7;
   --surface: #ffffff;
-  --muted: #4a5263;
-  --line: #c9c4b8;
+  --surface-2: #f1f3f6;   /* segmented control track, quiet fills */
+  --surface-3: #eef0f3;   /* progress track, future step number */
+  --line: #e3e6eb;
+  --line-strong: #d5dae1;
+  --line-dashed: #cbd1d9;
+  --dot: #e6e9ee;         /* board dot grid */
+
+  /* Text */
+  --ink: #111827;
+  --ink-2: #374151;
+  --muted: #5b6472;
+
+  /* Accent */
+  --accent: #2f4bd8;
+  --accent-hover: #1e35a8;
+  --accent-ink: #1e35a8;  /* accent-coloured text on a tint */
+  --accent-tint: #f0f4ff;
+  --accent-tint-2: #f7f9ff;
+  --accent-tint-border: #c7d2fe;
   --on-accent: #ffffff;
+
+  /* Strong (dark) buttons: Raise hand, Play recording */
+  --strong: #111827;
+  --strong-hover: #1f2937;
+  --on-strong: #ffffff;
+
+  /* Status */
+  --ok: #166534;
+  --ok-bg: #ecfdf3;
+  --ok-border: #bbf7d0;
+  --ok-dot: #16a34a;
+  --danger: #b42318;
+  --danger-ink: #912018;
+  --danger-bg: #fef3f2;
+  --danger-border: #fecdca;
+  --warn: #9a3412;
+  --warn-bg: #fff7ed;
+  --warn-border: #fed7aa;
+
+  /* Board */
+  --ink-answer: #c2410c;
+  --board-bg: #ffffff;
+  --focus: #2f4bd8;
+
+  /* Captions bar (dark in both themes) */
+  --caption-bg: rgb(17 24 39 / 0.92);
+  --caption-ink: #ffffff;
+
+  /* Shape and type */
+  --radius-sm: 10px;
+  --radius: 12px;
+  --radius-md: 14px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+  --shadow-sm: 0 1px 2px rgb(17 24 39 / 0.04);
+  --shadow-card: 0 1px 2px rgb(17 24 39 / 0.04), 0 8px 24px rgb(17 24 39 / 0.05);
+  --shadow-accent: 0 10px 30px rgb(47 75 216 / 0.12);
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-board: 'Playpen Sans', 'Comic Sans MS', cursive;
 }
 
+/* Dark theme: same roles, AA contrast for text on its surfaces. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink: #eceff6;
-    --ink-answer: #8fb4ff;
-    --board-bg: #1b1f2a;
-    --accent: #b6a4ff;
+    --page-bg: #0e1116;
+    --surface: #161a22;
+    --surface-2: #1f242e;
+    --surface-3: #262c37;
+    --line: #2a303b;
+    --line-strong: #363d4a;
+    --line-dashed: #3f4756;
+    --dot: #262c37;
+
+    --ink: #e8ebf0;
+    --ink-2: #cfd4dc;
+    --muted: #a3abb8;
+
+    --accent: #8ea2ff;
+    --accent-hover: #b0bfff;
+    --accent-ink: #b8c4ff;
+    --accent-tint: #1b2242;
+    --accent-tint-2: #181e36;
+    --accent-tint-border: #3a4a8f;
+    --on-accent: #0e1116;
+
+    --strong: #e8ebf0;
+    --strong-hover: #ffffff;
+    --on-strong: #0e1116;
+
     --ok: #6fd48b;
-    --warn: #f0b95a;
+    --ok-bg: #11261a;
+    --ok-border: #1f5132;
+    --ok-dot: #4ade80;
     --danger: #ff8f87;
-    --focus: #8fb4ff;
-    --page-bg: #11141b;
-    --surface: #1b1f2a;
-    --muted: #b8bfcc;
-    --line: #3a4152;
-    --on-accent: #11141b;
+    --danger-ink: #ffb4ae;
+    --danger-bg: #2c1514;
+    --danger-border: #5c2420;
+    --warn: #fdba74;
+    --warn-bg: #2b1a0e;
+    --warn-border: #5c3416;
+
+    --ink-answer: #fb923c;
+    --board-bg: #161a22;
+    --focus: #8ea2ff;
+
+    --caption-bg: rgb(5 7 11 / 0.92);
+    --caption-ink: #f3f4f6;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.25);
+    --shadow-accent: 0 10px 30px rgb(0 0 0 / 0.35);
   }
 }

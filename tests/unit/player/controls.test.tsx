@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { createRef } from 'react'
@@ -70,14 +70,16 @@ describe('Controls', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Forward one step' }))
     await userEvent.click(screen.getByRole('button', { name: 'Replay this step' }))
     await userEvent.click(screen.getByRole('button', { name: 'Mute' }))
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Speed' }), '1.5')
+    const speed = screen.getByRole('group', { name: 'Speed' })
+    expect(within(speed).getByRole('button', { name: '1×' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(within(speed).getByRole('button', { name: '1.5×' }))
     expect(h.onTogglePlay).toHaveBeenCalled()
     expect(h.onBack).toHaveBeenCalled()
     expect(h.onForward).toHaveBeenCalled()
     expect(h.onReplay).toHaveBeenCalled()
     expect(h.onToggleMute).toHaveBeenCalled()
     expect(h.onSpeed).toHaveBeenCalledWith(1.5)
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['0.75×', '1×', '1.25×', '1.5×'])
+    expect(within(speed).getAllByRole('button').map((o) => o.textContent)).toEqual(['0.75×', '1×', '1.25×', '1.5×'])
     rerender(<Controls paused muted speed={1} {...h} />)
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Unmute' })).toBeInTheDocument()

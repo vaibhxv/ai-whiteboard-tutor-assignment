@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { CircleX, Hand } from 'lucide-react'
 import type { Action } from '../actions'
-import { Checkpoint, FIRST_WRONG, SECOND_WRONG } from '../checkpoint/Checkpoint'
+import { Checkpoint, FeedbackText, FIRST_WRONG, SECOND_WRONG } from '../checkpoint/Checkpoint'
 import type { CheckGrade, LessonEvent } from '../lesson/events'
 import { activeCheck } from '../lesson/selectors'
 import type { LessonState } from '../lesson/types'
@@ -48,7 +49,9 @@ export function CheckpointArea({ state, dispatch, selectedInFigure, paramValue, 
 
   if (!check) {
     return note ? (
-      <p ref={noteEl} className="cp-note" role="status" data-result="wrong"><span aria-hidden="true">✗ </span>{note.text}</p>
+      <p ref={noteEl} className="cp-note" role="status" data-result="wrong">
+        <CircleX className="fb-icon" size={20} aria-hidden="true" /><FeedbackText text={note.text} />
+      </p>
     ) : null
   }
 
@@ -108,23 +111,45 @@ function HandBar({ state, dispatch, controller, replay, onRaiseHand }: Pick<Side
   const seg = currentSegment(state)
   const lostHere = seg ? Object.values(state.segments).filter((g) => g.kind === 'lost' && g.n === seg.n).length : 0
   const lostBlocked = replay && lostHere >= 1
+  const asks = seg?.asks ?? []
   return (
-    <div className="hand-bar">
-      <div className="btn-row">
-        <button type="button" onClick={onRaiseHand} disabled={open}>✋ Raise hand</button>
+    <div className="panel hand-bar">
+      <span className="eyebrow hand-eyebrow">Stuck? Stop the tutor</span>
+      <div className="hand-buttons">
+        <button type="button" className="strong" onClick={onRaiseHand} disabled={open}>
+          <Hand size={18} aria-hidden="true" />Raise hand
+        </button>
         <button
           type="button" disabled={open || lostBlocked} aria-describedby={lostBlocked ? 'lost-reason' : undefined}
           onClick={() => dispatch({ type: 'lost/request' })}
-        >😕 I'm lost</button>
+        >I'm lost</button>
       </div>
       {lostBlocked ? <p id="lost-reason" className="helper">{LOST_LIMIT_REASON}</p> : null}
-      {!open ? (
-        <SuggestedChips
-          asks={seg?.asks ?? []}
-          onAsk={(a) => { onRaiseHand(); controller.ask({ question: a.text, targets: [], askId: a.id }) }}
-        />
+      {!open && asks.length > 0 ? (
+        <>
+          <span className="helper ask-lead">Or ask about this step</span>
+          <SuggestedChips
+            asks={asks}
+            onAsk={(a) => { onRaiseHand(); controller.ask({ question: a.text, targets: [], askId: a.id }) }}
+          />
+        </>
       ) : null}
+      {!open ? <span className="helper tip">Tip: click anything on the board to ask about it.</span> : null}
     </div>
+  )
+}
+
+/** "Step 4 of 9 in this part": the cursor within the current segment, once that segment has fully arrived. */
+function GoalProgress({ state }: { state: LessonState }) {
+  const seg = currentSegment(state)
+  if (!seg || seg.status !== 'complete' || seg.beats.length < 2) return null
+  const total = seg.beats.length
+  const at = Math.min(total, Math.max(1, state.cursor.beat + 1))
+  return (
+    <>
+      <div className="goal-bar" aria-hidden="true"><div style={{ width: `${(at / total) * 100}%` }} /></div>
+      <span className="helper goal-step">Step {at} of {total} in this part</span>
+    </>
   )
 }
 
@@ -135,7 +160,10 @@ export function SidePanel(p: SidePanelProps) {
   return (
     <aside className="side" aria-label="Lesson panel">
       {state.objective ? (
-        <p className="objective"><span className="objective-label">Goal: </span>{state.objective}</p>
+        <div className="panel goal">
+          <p className="objective"><span className="eyebrow objective-label">Goal<span className="visually-hidden">: </span></span>{state.objective}</p>
+          {inLesson ? <GoalProgress state={state} /> : null}
+        </div>
       ) : null}
       {inLesson && !p.checkpointInStage ? (
         <CheckpointArea

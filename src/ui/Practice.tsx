@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CircleCheck, CircleX } from 'lucide-react'
 import { Checkpoint } from '../checkpoint/Checkpoint'
 import type { CheckGrade, LessonEvent } from '../lesson/events'
 import type { LessonState, SegKey } from '../lesson/types'
@@ -56,8 +57,8 @@ export function Practice({ state, dispatch, onReview, onHome }: {
           <p className="cp-prompt">{current.prompt}</p>
           <p ref={feedback} tabIndex={-1} className="cp-feedback" role="status" data-result={mine.grade.result}>
             {mine.grade.result === 'correct'
-              ? <><span aria-hidden="true">✓ </span>Correct — {current.explain}</>
-              : <><span aria-hidden="true">✗ </span>Not quite. {current.explain}</>}
+              ? <><CircleCheck className="fb-icon" size={20} aria-hidden="true" />Correct — {current.explain}</>
+              : <><CircleX className="fb-icon" size={20} aria-hidden="true" />Not quite. {current.explain}</>}
           </p>
           <button type="button" className="primary" onClick={next}>{n < checks.length ? 'Next question' : 'See how it went'}</button>
         </div>

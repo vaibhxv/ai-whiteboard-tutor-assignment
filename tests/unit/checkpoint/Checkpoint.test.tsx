@@ -27,7 +27,8 @@ describe('Checkpoint', () => {
     const f = setup(choice)
     await u.click(screen.getByLabelText('Beta'))
     await u.click(screen.getByRole('button', { name: 'Check' }))
-    expect(screen.getByRole('status').textContent).toBe("✗ Not quite. Let's look at it another way.")
+    expect(screen.getByRole('status').textContent).toBe("Not quite. Let's look at it another way.")
+    expect(screen.getByRole('status').querySelector('svg[aria-hidden="true"]')).not.toBeNull() // icon + words, never colour alone
     expect(f.onAnswer).toHaveBeenCalledWith({ result: 'wrong', branch: 'b', misconception: 'm' })
     expect(document.body.textContent).not.toMatch(/Because|Correct/)
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
@@ -38,7 +39,7 @@ describe('Checkpoint', () => {
     setup(num, { record: { id: 'c1', attempts: 2, branches: [], unsure: 0 } })
     await u.type(screen.getByLabelText('Your answer'), '9')
     await u.click(screen.getByRole('button', { name: 'Check' }))
-    expect(screen.getByRole('status').textContent).toBe("✗ Let's work through it together.")
+    expect(screen.getByRole('status').textContent).toBe("Let's work through it together.")
   })
 
   test('correct shows explain and Continue', async () => {
@@ -46,7 +47,8 @@ describe('Checkpoint', () => {
     const f = setup(num)
     await u.type(screen.getByLabelText('Your answer'), '2')
     await u.click(screen.getByRole('button', { name: 'Check' }))
-    expect(screen.getByRole('status').textContent).toBe('✓ Correct — Because.')
+    expect(screen.getByRole('status').textContent).toBe('Correct — Because.')
+    expect(screen.getByRole('status').querySelector('svg[aria-hidden="true"]')).not.toBeNull()
     await u.click(screen.getByRole('button', { name: 'Continue' }))
     expect(f.onContinue).toHaveBeenCalledOnce()
   })

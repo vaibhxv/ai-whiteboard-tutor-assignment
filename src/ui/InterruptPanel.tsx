@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Action, AskAction } from '../actions'
 import { describeAction } from '../board/describe'
 import type { LessonController } from '../lesson/controller'
@@ -108,7 +109,7 @@ function AskForm({ controller, dispatch, index, replay, asks }: InterruptPanelPr
             return (
               <li key={t} className="chip chip-target">
                 <span>{label}</span>
-                <button type="button" aria-label={`Remove ${label}`} onClick={() => setTargets(targets.filter((x) => x !== t))}>×</button>
+                <button type="button" aria-label={`Remove ${label}`} onClick={() => setTargets(targets.filter((x) => x !== t))}><X size={16} aria-hidden="true" /></button>
               </li>
             )
           })}
